@@ -23,6 +23,17 @@ function isBlocked(cmd: string): boolean {
   return BLOCKED.some((re) => re.test(cmd));
 }
 
+// Fix common model-generated command typos before they reach the shell
+function sanitize(cmd: string): string {
+  return cmd
+    .replace(/^git add\.(?=\s|$)/m, "git add .")      // git add.  → git add .
+    .replace(/^git add-A(?=\s|$)/m, "git add -A")      // git add-A → git add -A
+    .replace(/\bls\s+--a\b/g, "ls -a")                 // ls --a    → ls -a
+    .replace(/\bls\s+--la\b/g, "ls -la")               // ls --la   → ls -la
+    .replace(/\bls\s+--l\b/g, "ls -l")                 // ls --l    → ls -l
+    .trim();
+}
+
 function resolveCwd(raw: string): string {
   return path.resolve(raw.replace(/^~/, os.homedir()));
 }
@@ -61,7 +72,8 @@ export const terminalTools = {
       required: ["command"],
     } as const,
     handler({ command, cwd }: { command: string; cwd?: string }): string {
-      if (isBlocked(command)) {
+      const cmd = sanitize(command);
+      if (isBlocked(cmd)) {
         return "Blocked: this command matches a dangerous pattern and will not be executed.";
       }
 
@@ -71,10 +83,10 @@ export const terminalTools = {
         return `Error: working directory does not exist: ${runIn}`;
       }
 
-      const confirmed = askConfirm(command, runIn);
+      const confirmed = askConfirm(cmd, runIn);
       if (!confirmed) return "Command cancelled by user.";
 
-      const result = spawnSync("bash", ["-c", command], {
+      const result = spawnSync("bash", ["-c", cmd], {
         encoding: "utf-8",
         cwd: runIn,
         timeout: 30_000,
