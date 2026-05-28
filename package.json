@@ -1,0 +1,32 @@
+{
+  "name": "dream",
+  "version": "1.0.0",
+  "description": "Local AI assistant powered by Phi-4 14B",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "build": "tsc",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
+    "setup": "tsx scripts/setup.ts",
+    "setup-github": "tsx scripts/setup-github.ts",
+    "setup-gmail": "tsx scripts/setup-gmail.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@typescript-eslint/eslint-plugin": "^8.60.0",
+    "@typescript-eslint/parser": "^8.60.0",
+    "eslint": "^10.4.0",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "chalk": "^5.6.2",
+    "googleapis": "^172.0.0",
+    "node-llama-cpp": "^3.18.1"
+  }
+}

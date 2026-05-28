@@ -1,0 +1,16 @@
+node_modules/
+dist/
+models/
+*.gguf
+
+# credentials must never be committed — they live in ~/.dream/
+credentials.json
+.env
+*.local
+
+# macOS
+.DS_Store
+
+# editor
+.vscode/
+.idea/
