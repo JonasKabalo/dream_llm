@@ -73,17 +73,41 @@ export function printBanner(): void {
   console.log();
 }
 
-export function printLoading(): void {
-  process.stdout.write("  " + chalk.yellow("⟳") + chalk.dim("  Loading model..."));
+const LOAD_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+export function startLoadingPhase(label: string): () => number {
+  let frameIdx = 0;
+  const startTime = Date.now();
+
+  const render = (): void => {
+    const secs = Math.floor((Date.now() - startTime) / 1000);
+    process.stdout.write(
+      "\r  " + chalk.yellow(LOAD_FRAMES[frameIdx]) +
+      chalk.dim("  " + label + "  ") +
+      chalk.yellow(secs + "s") + "   ",
+    );
+  };
+
+  render();
+  const id = setInterval(() => {
+    frameIdx = (frameIdx + 1) % LOAD_FRAMES.length;
+    render();
+  }, 80);
+
+  return (): number => {
+    clearInterval(id);
+    return Date.now() - startTime;
+  };
 }
 
-export function clearLoading(): void {
+export function clearLoading(loadMs: number, warmMs: number): void {
   const line =
     "  " + chalk.green("✓") + "  " +
     chalk.bold("Ready") +
     chalk.dim("  ·  Type ") +
     chalk.cyan("/tools-list") +
-    chalk.dim(" to see what I can do.");
+    chalk.dim(" to see what I can do.") +
+    chalk.dim(`  (model ${(loadMs / 1000).toFixed(1)}s  ·  warmup ${(warmMs / 1000).toFixed(1)}s)`);
   process.stdout.write("\r" + line + "\n\n");
 }
 

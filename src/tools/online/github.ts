@@ -13,11 +13,11 @@ function owner(): string {
 
 export const githubTools = {
   listMyRepos: {
-    description: "List the user's GitHub repositories.",
+    description: "List the user's GitHub repos.",
     params: {
       type: "object",
       properties: {
-        type: { type: "string", description: "Filter: 'all', 'public', 'private'. Default: 'all'" },
+        type: { type: "string", description: "'all', 'public', or 'private'" },
       },
     } as const,
     async handler({ type }: { type?: string }): Promise<string> {
@@ -32,11 +32,11 @@ export const githubTools = {
   },
 
   getRepoInfo: {
-    description: "Get details about a GitHub repository: description, branches, open PRs, stars.",
+    description: "Get a repo's description, default branch, stars and open issues.",
     params: {
       type: "object",
       properties: {
-        repo: { type: "string", description: "Repository name (e.g. 'dream' or 'username/dream')" },
+        repo: { type: "string", description: "Repo name or 'owner/repo'" },
       },
       required: ["repo"],
     } as const,
@@ -74,15 +74,15 @@ export const githubTools = {
   },
 
   createPullRequest: {
-    description: "Create a pull request on a GitHub repository.",
+    description: "Create a GitHub pull request.",
     params: {
       type: "object",
       properties: {
-        repo: { type: "string", description: "Repository name" },
+        repo: { type: "string", description: "Repo name" },
         title: { type: "string", description: "PR title" },
-        body: { type: "string", description: "PR description (markdown supported)" },
-        head: { type: "string", description: "Branch with changes (source)" },
-        base: { type: "string", description: "Branch to merge into (target, e.g. 'main')" },
+        body: { type: "string", description: "PR description (markdown)" },
+        head: { type: "string", description: "Source branch" },
+        base: { type: "string", description: "Target branch e.g. 'main'" },
       },
       required: ["repo", "title", "body", "head", "base"],
     } as const,
@@ -97,7 +97,7 @@ export const githubTools = {
   },
 
   listPullRequests: {
-    description: "List open pull requests on a GitHub repository.",
+    description: "List open pull requests in a repo.",
     params: {
       type: "object",
       properties: {
@@ -115,11 +115,11 @@ export const githubTools = {
   },
 
   createIssue: {
-    description: "Create a new issue on a GitHub repository.",
+    description: "Create a GitHub issue.",
     params: {
       type: "object",
       properties: {
-        repo: { type: "string", description: "Repository name" },
+        repo: { type: "string", description: "Repo name" },
         title: { type: "string", description: "Issue title" },
         body: { type: "string", description: "Issue description" },
       },
@@ -134,7 +134,7 @@ export const githubTools = {
   },
 
   listIssues: {
-    description: "List open issues on a GitHub repository.",
+    description: "List open issues in a repo.",
     params: {
       type: "object",
       properties: {

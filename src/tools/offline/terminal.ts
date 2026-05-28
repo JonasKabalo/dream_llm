@@ -4,6 +4,7 @@ import os from "os";
 import path from "path";
 import chalk from "chalk";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
+import { PROJECT_ROOT } from "../../config.js";
 
 const BLOCKED = [
   /rm\s+-rf\s+[/~]/,
@@ -15,8 +16,8 @@ const BLOCKED = [
   /chmod\s+-R\s+777\s+\//,
 ];
 
-// Remembered working directory — persists for the session
-let currentCwd: string = os.homedir();
+// Remembered working directory — starts at the project root, persists for the session
+let currentCwd: string = PROJECT_ROOT;
 
 function isBlocked(cmd: string): boolean {
   return BLOCKED.some((re) => re.test(cmd));
@@ -50,16 +51,12 @@ function askConfirm(command: string, cwd: string): boolean {
 
 export const terminalTools = {
   runTerminalCommand: {
-    description:
-      "Run a shell command on the user's Mac and return the output. " +
-      "Always asks the user for confirmation before executing. " +
-      "Runs in the remembered working directory unless overridden. " +
-      "Use for git, npm, file inspection, port checking, scripts, etc.",
+    description: "Run a shell command (always asks confirmation). Use for git, npm, scripts, ports etc.",
     params: {
       type: "object",
       properties: {
-        command: { type: "string", description: "The shell command to run" },
-        cwd: { type: "string", description: "Working directory override (optional). Uses the remembered cwd by default." },
+        command: { type: "string", description: "Shell command to run" },
+        cwd: { type: "string", description: "Working directory override (uses remembered cwd by default)" },
       },
       required: ["command"],
     } as const,
@@ -97,13 +94,11 @@ export const terminalTools = {
   },
 
   setWorkingDirectory: {
-    description:
-      "Set the default working directory used for all future terminal commands in this session. " +
-      "Use when the user says things like 'work in ~/project/dream' or 'cd into my project'.",
+    description: "Set the default directory for future terminal commands.",
     params: {
       type: "object",
       properties: {
-        dirPath: { type: "string", description: "Absolute or ~ path to set as working directory" },
+        dirPath: { type: "string", description: "Absolute or ~ path" },
       },
       required: ["dirPath"],
     } as const,
@@ -117,7 +112,7 @@ export const terminalTools = {
   },
 
   getWorkingDirectory: {
-    description: "Get the current default working directory used for terminal commands.",
+    description: "Get the current default working directory.",
     params: { type: "object", properties: {} } as const,
     handler(): string {
       return `Current working directory: ${currentCwd}`;

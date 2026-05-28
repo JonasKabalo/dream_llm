@@ -45,9 +45,9 @@ export const gmailTools = {
     params: {
       type: "object",
       properties: {
-        to: { type: "string", description: "Recipient email address" },
-        subject: { type: "string", description: "Email subject" },
-        body: { type: "string", description: "Email body (plain text)" },
+        to: { type: "string", description: "Recipient email" },
+        subject: { type: "string", description: "Subject line" },
+        body: { type: "string", description: "Plain text body" },
       },
       required: ["to", "subject", "body"],
     } as const,
@@ -60,13 +60,13 @@ export const gmailTools = {
   },
 
   createDraft: {
-    description: "Save an email as a Gmail draft without sending it.",
+    description: "Save an email as a Gmail draft without sending.",
     params: {
       type: "object",
       properties: {
-        to: { type: "string", description: "Recipient email address" },
-        subject: { type: "string", description: "Email subject" },
-        body: { type: "string", description: "Email body (plain text)" },
+        to: { type: "string", description: "Recipient email" },
+        subject: { type: "string", description: "Subject line" },
+        body: { type: "string", description: "Plain text body" },
       },
       required: ["to", "subject", "body"],
     } as const,
@@ -79,12 +79,12 @@ export const gmailTools = {
   },
 
   listEmails: {
-    description: "List or search recent emails in Gmail.",
+    description: "List or search Gmail messages.",
     params: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Gmail search query, e.g. 'from:boss@company.com', 'is:unread', 'subject:invoice'. Leave empty for latest inbox." },
-        maxResults: { type: "number", description: "Number of emails to return (default 10, max 20)" },
+        query: { type: "string", description: "Gmail search e.g. 'from:boss@co.com', 'is:unread'. Empty for inbox." },
+        maxResults: { type: "number", description: "Number of emails (default 10, max 20)" },
       },
     } as const,
     async handler({ query, maxResults }: { query?: string; maxResults?: number }): Promise<string> {
@@ -113,11 +113,11 @@ export const gmailTools = {
   },
 
   readEmail: {
-    description: "Read the full content of a specific email by its ID.",
+    description: "Read a full email by its ID.",
     params: {
       type: "object",
       properties: {
-        id: { type: "string", description: "Email message ID (from listEmails)" },
+        id: { type: "string", description: "Message ID from listEmails" },
       },
       required: ["id"],
     } as const,

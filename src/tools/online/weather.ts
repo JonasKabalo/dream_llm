@@ -87,16 +87,11 @@ async function fetchWeather(lat: number, lon: number, label: string): Promise<We
 
 export const weatherTools = {
   getWeather: {
-    description:
-      "Get the current weather conditions for a location. " +
-      "If the user does not specify a location, automatically detect their current location.",
+    description: "Get current weather for a location. Omit location to auto-detect.",
     params: {
       type: "object",
       properties: {
-        location: {
-          type: "string",
-          description: "City or place name, e.g. 'Paris', 'New York', 'Tokyo'. Omit to use current location.",
-        },
+        location: { type: "string", description: "City name e.g. 'Paris'. Omit for current location." },
       },
     } as const,
     async handler({ location }: { location?: string }): Promise<WeatherResult> {

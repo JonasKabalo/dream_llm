@@ -16,11 +16,11 @@ function noteFile(title: string): string {
 
 export const notesTools = {
   createNote: {
-    description: "Create or overwrite a local note with a title and content. Notes are stored in ~/.dream-notes/.",
+    description: "Create or overwrite a note in ~/.dream-notes/.",
     params: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Note title (used as filename)" },
+        title: { type: "string", description: "Note title" },
         content: { type: "string", description: "Note content" },
       },
       required: ["title", "content"],
@@ -35,7 +35,7 @@ export const notesTools = {
   },
 
   listNotes: {
-    description: "List all saved notes with their titles and last modified dates.",
+    description: "List all saved notes with last-modified dates.",
     params: { type: "object", properties: {} } as const,
     handler(): string {
       ensureNotesDir();
@@ -52,11 +52,11 @@ export const notesTools = {
   },
 
   readNote: {
-    description: "Read the content of a saved note by title.",
+    description: "Read a note's content by title.",
     params: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Title of the note to read" },
+        title: { type: "string", description: "Note title" },
       },
       required: ["title"],
     } as const,
@@ -69,11 +69,11 @@ export const notesTools = {
   },
 
   deleteNote: {
-    description: "Delete a saved note by title.",
+    description: "Delete a note by title.",
     params: {
       type: "object",
       properties: {
-        title: { type: "string", description: "Title of the note to delete" },
+        title: { type: "string", description: "Note title" },
       },
       required: ["title"],
     } as const,
@@ -87,11 +87,11 @@ export const notesTools = {
   },
 
   searchNotes: {
-    description: "Search through all note contents for a keyword or phrase.",
+    description: "Search note contents for a keyword.",
     params: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Text to search for inside notes" },
+        query: { type: "string", description: "Text to find" },
       },
       required: ["query"],
     } as const,

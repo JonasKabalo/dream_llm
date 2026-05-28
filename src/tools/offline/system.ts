@@ -10,7 +10,7 @@ function formatBytes(bytes: number): string {
 
 export const systemTools = {
   getSystemInfo: {
-    description: "Get current system stats: memory usage, disk space, battery level, CPU load, and uptime.",
+    description: "Get memory, disk, battery, CPU load and uptime.",
     params: { type: "object", properties: {} } as const,
     handler(): string {
       const totalMem = os.totalmem();
@@ -47,11 +47,11 @@ export const systemTools = {
   },
 
   openFile: {
-    description: "Open a file with its default application on macOS (like double-clicking it).",
+    description: "Open a file with its default macOS app.",
     params: {
       type: "object",
       properties: {
-        filePath: { type: "string", description: "Absolute or ~ path to the file to open" },
+        filePath: { type: "string", description: "Absolute or ~ path" },
       },
       required: ["filePath"],
     } as const,
@@ -64,11 +64,11 @@ export const systemTools = {
   },
 
   openApp: {
-    description: "Launch a macOS application by name (e.g. 'Spotify', 'Figma', 'Safari', 'VS Code').",
+    description: "Launch a macOS app by name.",
     params: {
       type: "object",
       properties: {
-        appName: { type: "string", description: "Name of the app to open" },
+        appName: { type: "string", description: "App name e.g. 'Spotify', 'Safari'" },
       },
       required: ["appName"],
     } as const,

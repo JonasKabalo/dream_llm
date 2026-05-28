@@ -32,6 +32,7 @@ export class DreamModel {
     this.model = await this.llama.loadModel({ modelPath: config.modelPath });
     this.context = await this.model.createContext({
       contextSize: config.contextSize ?? 4096,
+      flashAttention: true,
     });
     this.session = new LlamaChatSession({
       contextSequence: this.context.getSequence(),
@@ -43,6 +44,7 @@ export class DreamModel {
     message: string,
     functions?: ChatSessionModelFunctions,
     onChunk?: (token: string) => void,
+    maxTokens?: number,
   ): Promise<ChatMeta> {
     if (!this.session) throw new Error("Model not loaded. Call load() first.");
 
@@ -54,6 +56,7 @@ export class DreamModel {
       onTextChunk: onChunk,
       onToken: () => { tokens++; },
       temperature: this.temperature,
+      maxTokens,
     });
 
     return { text, tokens, ms: Date.now() - start };

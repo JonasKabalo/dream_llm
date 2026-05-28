@@ -3,6 +3,9 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// Root of the project — wherever `npm start` is run from
+export const PROJECT_ROOT = process.cwd();
+
 export const MODEL_PATH = path.join(__dirname, "..", "models", "hf_bartowski_phi-4-Q4_K_M.gguf");
 
 export const SYSTEM_PROMPT = `You are Dream, a personal AI assistant running locally on the user's Mac.

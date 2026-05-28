@@ -2,21 +2,27 @@ import type { ChatSessionModelFunctions } from "node-llama-cpp";
 
 export const datetimeTools = {
   getCurrentDateTime: {
-    description:
-      "Get the current date and time. Optionally pass a timezone (e.g. 'Europe/Paris', 'America/New_York') " +
-      "to get the time in that location. Works fully offline.",
+    description: "Get current date, time and timezone. Pass a timezone to convert.",
     params: {
       type: "object",
       properties: {
-        timezone: {
-          type: "string",
-          description: "IANA timezone name, e.g. 'Europe/Paris'. Omit to use the user's local timezone.",
-        },
+        timezone: { type: "string", description: "IANA timezone e.g. 'Europe/Paris'. Omit for local." },
       },
     } as const,
     handler({ timezone }: { timezone?: string }): { date: string; time: string; timezone: string; iso: string } {
       const now = new Date();
-      const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      let tz = localTz;
+      if (timezone?.trim()) {
+        try {
+          Intl.DateTimeFormat("en-US", { timeZone: timezone });
+          tz = timezone;
+        } catch {
+          tz = localTz;
+        }
+      }
+
       return {
         date: now.toLocaleDateString("en-US", {
           weekday: "long", year: "numeric", month: "long", day: "numeric",

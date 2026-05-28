@@ -21,12 +21,12 @@ function safePath(rawPath: string): string {
 
 export const filesystemTools = {
   createFile: {
-    description: "Create a new file at the given path with the given text content. Creates parent directories if needed.",
+    description: "Create a file with text content. Makes parent dirs if needed.",
     params: {
       type: "object",
       properties: {
-        filePath: { type: "string", description: "Absolute or ~ path to the file to create" },
-        content: { type: "string", description: "Text content to write into the file" },
+        filePath: { type: "string", description: "Absolute or ~ path" },
+        content: { type: "string", description: "Text to write" },
       },
       required: ["filePath", "content"],
     } as const,
@@ -39,11 +39,11 @@ export const filesystemTools = {
   },
 
   readFile: {
-    description: "Read and return the text content of a file at the given path.",
+    description: "Read a file's text content.",
     params: {
       type: "object",
       properties: {
-        filePath: { type: "string", description: "Absolute or ~ path to the file to read" },
+        filePath: { type: "string", description: "Absolute or ~ path" },
       },
       required: ["filePath"],
     } as const,
@@ -57,11 +57,11 @@ export const filesystemTools = {
   },
 
   listDirectory: {
-    description: "List files and folders inside a directory.",
+    description: "List files and folders in a directory.",
     params: {
       type: "object",
       properties: {
-        dirPath: { type: "string", description: "Absolute or ~ path to the directory" },
+        dirPath: { type: "string", description: "Absolute or ~ path" },
       },
       required: ["dirPath"],
     } as const,
@@ -77,11 +77,11 @@ export const filesystemTools = {
   },
 
   deleteFile: {
-    description: "Delete a file at the given path. Does not delete directories.",
+    description: "Delete a file (not a directory).",
     params: {
       type: "object",
       properties: {
-        filePath: { type: "string", description: "Absolute or ~ path to the file to delete" },
+        filePath: { type: "string", description: "Absolute or ~ path" },
       },
       required: ["filePath"],
     } as const,
@@ -96,11 +96,11 @@ export const filesystemTools = {
   },
 
   appendToFile: {
-    description: "Append text content to the end of an existing file.",
+    description: "Append text to the end of a file.",
     params: {
       type: "object",
       properties: {
-        filePath: { type: "string", description: "Absolute or ~ path to the file" },
+        filePath: { type: "string", description: "Absolute or ~ path" },
         content: { type: "string", description: "Text to append" },
       },
       required: ["filePath", "content"],
@@ -114,12 +114,12 @@ export const filesystemTools = {
   },
 
   moveFile: {
-    description: "Move or rename a file from one path to another.",
+    description: "Move or rename a file.",
     params: {
       type: "object",
       properties: {
-        sourcePath: { type: "string", description: "Current file path" },
-        destPath: { type: "string", description: "Destination file path" },
+        sourcePath: { type: "string", description: "Current path" },
+        destPath: { type: "string", description: "New path" },
       },
       required: ["sourcePath", "destPath"],
     } as const,
@@ -134,12 +134,12 @@ export const filesystemTools = {
   },
 
   copyFile: {
-    description: "Copy a file from one path to another.",
+    description: "Copy a file to a new location.",
     params: {
       type: "object",
       properties: {
-        sourcePath: { type: "string", description: "Source file path" },
-        destPath: { type: "string", description: "Destination file path" },
+        sourcePath: { type: "string", description: "Source path" },
+        destPath: { type: "string", description: "Destination path" },
       },
       required: ["sourcePath", "destPath"],
     } as const,
@@ -154,11 +154,11 @@ export const filesystemTools = {
   },
 
   createDirectory: {
-    description: "Create a directory (and any missing parent directories).",
+    description: "Create a directory and any missing parents.",
     params: {
       type: "object",
       properties: {
-        dirPath: { type: "string", description: "Path of the directory to create" },
+        dirPath: { type: "string", description: "Absolute or ~ path" },
       },
       required: ["dirPath"],
     } as const,
@@ -170,11 +170,11 @@ export const filesystemTools = {
   },
 
   getFileInfo: {
-    description: "Get metadata about a file: size, created date, last modified date.",
+    description: "Get file metadata: size, created, modified.",
     params: {
       type: "object",
       properties: {
-        filePath: { type: "string", description: "Absolute or ~ path to the file" },
+        filePath: { type: "string", description: "Absolute or ~ path" },
       },
       required: ["filePath"],
     } as const,
@@ -195,13 +195,13 @@ export const filesystemTools = {
   },
 
   searchFiles: {
-    description: "Search for files by name inside a directory. Supports partial name matching.",
+    description: "Find files by name inside a directory (case-insensitive substring match).",
     params: {
       type: "object",
       properties: {
-        dirPath: { type: "string", description: "Directory to search in" },
-        pattern: { type: "string", description: "Filename pattern to match (case-insensitive substring)" },
-        maxResults: { type: "number", description: "Max number of results (default 20)" },
+        dirPath: { type: "string", description: "Directory to search" },
+        pattern: { type: "string", description: "Substring to match against filenames" },
+        maxResults: { type: "number", description: "Max results (default 20)" },
       },
       required: ["dirPath", "pattern"],
     } as const,

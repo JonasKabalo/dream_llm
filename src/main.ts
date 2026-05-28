@@ -4,7 +4,7 @@ import { DreamModel } from "./model.js";
 import { Agent } from "./agent.js";
 import { MODEL_PATH, SYSTEM_PROMPT } from "./config.js";
 import { isCommand, runCommand } from "./commands.js";
-import { printBanner, printLoading, clearLoading, printGoodbye, printStats, startThinking, prompt } from "./ui.js";
+import { printBanner, startLoadingPhase, clearLoading, printGoodbye, printStats, startThinking, prompt } from "./ui.js";
 
 async function main(): Promise<void> {
   if (!fs.existsSync(MODEL_PATH)) {
@@ -14,14 +14,19 @@ async function main(): Promise<void> {
   }
 
   printBanner();
-  printLoading();
 
+  const stopLoading = startLoadingPhase("Loading model");
   const model = new DreamModel();
-  await model.load({ modelPath: MODEL_PATH, contextSize: 4096 }, SYSTEM_PROMPT);
-
-  clearLoading();
+  await model.load({ modelPath: MODEL_PATH }, SYSTEM_PROMPT);
+  const loadMs = stopLoading();
 
   const agent = new Agent(model);
+
+  const stopWarmup = startLoadingPhase("Warming cache");
+  await agent.warmup();
+  const warmMs = stopWarmup();
+
+  clearLoading(loadMs, warmMs);
 
   const rl = readline.createInterface({
     input: process.stdin,

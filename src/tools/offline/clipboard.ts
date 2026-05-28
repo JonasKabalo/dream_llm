@@ -3,7 +3,7 @@ import type { ChatSessionModelFunctions } from "node-llama-cpp";
 
 export const clipboardTools = {
   getClipboard: {
-    description: "Read the current content of the clipboard.",
+    description: "Read the current clipboard content.",
     params: { type: "object", properties: {} } as const,
     handler(): string {
       try {
@@ -15,11 +15,11 @@ export const clipboardTools = {
   },
 
   setClipboard: {
-    description: "Copy text to the clipboard so the user can paste it anywhere.",
+    description: "Copy text to the clipboard.",
     params: {
       type: "object",
       properties: {
-        text: { type: "string", description: "Text to copy to the clipboard" },
+        text: { type: "string", description: "Text to copy" },
       },
       required: ["text"],
     } as const,

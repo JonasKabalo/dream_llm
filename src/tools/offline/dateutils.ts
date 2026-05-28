@@ -14,15 +14,13 @@ function formatFull(d: Date): string {
 
 export const dateutilsTools = {
   calculateDate: {
-    description:
-      "Add or subtract days, weeks, months, or years from a date. " +
-      "Use 'today' as baseDate for relative calculations.",
+    description: "Add or subtract time from a date. Use 'today' as baseDate.",
     params: {
       type: "object",
       properties: {
-        baseDate: { type: "string", description: "Starting date in YYYY-MM-DD format, or 'today'" },
-        amount: { type: "number", description: "Number of units to add (negative to subtract)" },
-        unit: { type: "string", description: "Unit: days, weeks, months, or years" },
+        baseDate: { type: "string", description: "YYYY-MM-DD or 'today'" },
+        amount: { type: "number", description: "Units to add (negative to subtract)" },
+        unit: { type: "string", description: "days, weeks, months, or years" },
       },
       required: ["baseDate", "amount", "unit"],
     } as const,
@@ -42,12 +40,12 @@ export const dateutilsTools = {
   },
 
   dateDifference: {
-    description: "Calculate the number of days between two dates.",
+    description: "Days between two dates.",
     params: {
       type: "object",
       properties: {
-        from: { type: "string", description: "Start date in YYYY-MM-DD format, or 'today'" },
-        to: { type: "string", description: "End date in YYYY-MM-DD format, or 'today'" },
+        from: { type: "string", description: "YYYY-MM-DD or 'today'" },
+        to: { type: "string", description: "YYYY-MM-DD or 'today'" },
       },
       required: ["from", "to"],
     } as const,
