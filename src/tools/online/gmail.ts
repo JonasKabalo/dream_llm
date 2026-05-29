@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { getGmailCreds, saveCredentials } from "../../credentials.js";
+import { SENDER_NAME } from "../../config.js";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
 
 function getClient(): ReturnType<typeof google.gmail> {
@@ -27,21 +28,96 @@ function getClient(): ReturnType<typeof google.gmail> {
   return google.gmail({ version: "v1", auth });
 }
 
+const GREETING_PATTERNS = /^(hi|hello|dear|bonjour|salut)[,\s]/i;
+const CLOSING_PATTERNS = /kind regards|best regards|cordialement|sincèrement/i;
+
+function recipientFirstName(to: string): string {
+  const local = to.split("@")[0];
+  const cleaned = local.replace(/\d+/g, "");
+  const first = cleaned.split(/[.\-_]+/)[0];
+  return first.charAt(0).toUpperCase() + first.slice(1);
+}
+
+function senderName(): string {
+  try {
+    return getGmailCreds().displayName || SENDER_NAME;
+  } catch {
+    return SENDER_NAME;
+  }
+}
+
+function reflowParagraphs(text: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((para) => para.split("\n").join(" ").replace(/\s+/g, " ").trim())
+    .join("\n\n");
+}
+
+function formatBody(body: string, to: string): string {
+  let result = reflowParagraphs(body.trim());
+
+  if (!GREETING_PATTERNS.test(result)) {
+    result = `Hi ${recipientFirstName(to)},\n\n${result}`;
+  }
+
+  if (CLOSING_PATTERNS.test(result)) {
+    result = result.replace(/\n*(kind regards|best regards|cordialement|sincèrement)[\s\S]*/gi, "").trimEnd();
+  }
+
+  const name = senderName();
+  const signature = name ? `Kind regards,\n${name}` : "Kind regards,";
+  result = `${result.trimEnd()}\n\n${signature}`;
+
+  return result;
+}
+
+function encodeSubject(subject: string): string {
+  return /[^\x00-\x7F]/.test(subject)
+    ? `=?utf-8?B?${Buffer.from(subject, "utf-8").toString("base64")}?=`
+    : subject;
+}
+
+function toHtml(text: string): string {
+  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return esc
+    .split(/\n\n+/)
+    .map((para) => `<p style="margin:0 0 1em 0;font-family:sans-serif">${para.replace(/\n/g, "<br>")}</p>`)
+    .join("\n");
+}
+
 function encodeMail(to: string, subject: string, body: string, from?: string): string {
+  const formatted = formatBody(body, to);
   const lines = [
     from ? `From: ${from}` : "",
     `To: ${to}`,
-    `Subject: ${subject}`,
-    "Content-Type: text/plain; charset=utf-8",
+    `Subject: ${encodeSubject(subject)}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/html; charset=utf-8",
     "",
-    body,
+    toHtml(formatted),
   ].filter((l, i) => i !== 0 || l !== "");
   return Buffer.from(lines.join("\r\n")).toString("base64url");
 }
 
 export const gmailTools = {
+  previewEmail: {
+    description: "Preview how an email will look once formatted, WITHOUT sending it. Always call this before sendEmail so the user can confirm.",
+    params: {
+      type: "object",
+      properties: {
+        to: { type: "string", description: "Recipient email" },
+        subject: { type: "string", description: "Subject line" },
+        body: { type: "string", description: "Plain text body" },
+      },
+      required: ["to", "subject", "body"],
+    } as const,
+    handler({ to, subject, body }: { to: string; subject: string; body: string }): string {
+      return `To: ${to}\nSubject: ${subject}\n\n${formatBody(body, to)}`;
+    },
+  },
+
   sendEmail: {
-    description: "Send an email via Gmail.",
+    description: "Send an email via Gmail. Only call this after showing a previewEmail and getting the user's confirmation.",
     params: {
       type: "object",
       properties: {

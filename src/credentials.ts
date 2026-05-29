@@ -16,6 +16,8 @@ export interface GmailCredentials {
   accessToken: string;
   refreshToken: string;
   expiryDate: number;
+  email: string;
+  displayName: string;
 }
 
 export interface Credentials {

@@ -73,6 +73,26 @@ if (!tokens.refresh_token) {
   process.exit(1);
 }
 
+// Fetch the authenticated email address
+auth.setCredentials(tokens);
+const gmail = google.gmail({ version: "v1", auth });
+const profile = await gmail.users.getProfile({ userId: "me" });
+const email = profile.data.emailAddress ?? "";
+
+// Derive a suggested display name from the email address
+function suggestName(addr: string): string {
+  const local = addr.split("@")[0];
+  const cleaned = local.replace(/\d+/g, "");
+  const parts = cleaned.split(/[.\-_]+/).filter(Boolean);
+  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" ");
+}
+
+const suggested = suggestName(email);
+console.log(`\n  Detected email: ${email}`);
+
+const input = (await ask(`  Your name for email signatures [${suggested}]: `)).trim();
+const displayName = input || suggested;
+
 saveCredentials({
   gmail: {
     clientId,
@@ -80,9 +100,12 @@ saveCredentials({
     accessToken: tokens.access_token!,
     refreshToken: tokens.refresh_token,
     expiryDate: tokens.expiry_date ?? 0,
+    email,
+    displayName,
   },
 });
 
-console.log("\n  Gmail saved to ~/.dream/credentials.json");
+console.log(`\n  Signature will be: "Kind regards, ${displayName}"`);
+console.log("  Gmail saved to ~/.dream/credentials.json");
 console.log("  You can now ask Dream to read, draft, and send emails.\n");
 rl.close();
