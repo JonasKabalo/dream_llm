@@ -1,6 +1,6 @@
 # Dream — Local AI Assistant
 
-A fully local AI assistant powered by **Phi-4 14B**, running entirely on your Mac via Apple Silicon (M-series). No cloud, no subscription, works offline.
+A fully local AI assistant powered by **Phi-4 14B**, running fully offline on your Mac via Apple Silicon (M-series). No cloud, no subscription, works offline.
 
 Built with TypeScript and node-llama-cpp.
 

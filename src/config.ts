@@ -3,8 +3,9 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Root of the project — wherever `npm start` is run from
-export const PROJECT_ROOT = process.cwd();
+// Root of the project — always the directory containing package.json,
+// derived from this file's location (src/config.ts → one level up).
+export const PROJECT_ROOT = path.resolve(__dirname, "..");
 
 export const MODEL_PATH = path.join(__dirname, "..", "models", "hf_bartowski_phi-4-Q4_K_M.gguf");
 

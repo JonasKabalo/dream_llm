@@ -228,4 +228,41 @@ export const filesystemTools = {
       return results.length ? results.join("\n") : `No files matching "${pattern}" found in ${resolved}`;
     },
   },
+
+  editFile: {
+    description: "Find and replace text inside a file. Use to change specific content without rewriting the whole file.",
+    params: {
+      type: "object",
+      properties: {
+        filePath: { type: "string", description: "Absolute or ~ path to the file" },
+        find: { type: "string", description: "Exact text to find" },
+        replace: { type: "string", description: "Text to replace it with" },
+        replaceAll: { type: "boolean", description: "Replace every occurrence (true) or just the first (false). Default true." },
+      },
+      required: ["filePath", "find", "replace"],
+    } as const,
+    handler({ filePath, find, replace, replaceAll }: {
+      filePath: string; find: string; replace: string; replaceAll?: boolean;
+    }): string {
+      const resolved = safePath(filePath);
+      if (!fs.existsSync(resolved)) return `Error: file not found at ${resolved}`;
+      const stat = fs.statSync(resolved);
+      if (stat.size > 500_000) return `Error: file too large to edit (${(stat.size / 1024).toFixed(0)} KB). Max 500KB.`;
+
+      const original = fs.readFileSync(resolved, "utf-8");
+      if (!original.includes(find)) return `Error: text not found in ${resolved}:\n"${find}"`;
+
+      const all = replaceAll ?? true;
+      const updated = all
+        ? original.split(find).join(replace)
+        : original.replace(find, replace);
+
+      const count = all
+        ? (original.split(find).length - 1)
+        : 1;
+
+      fs.writeFileSync(resolved, updated, "utf-8");
+      return `Replaced ${count} occurrence${count !== 1 ? "s" : ""} in ${resolved}`;
+    },
+  },
 } satisfies ChatSessionModelFunctions;

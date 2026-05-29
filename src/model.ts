@@ -53,13 +53,18 @@ export class DreamModel {
 
     const text = await this.session.prompt(message, {
       functions,
-      onTextChunk: onChunk,
+      onTextChunk: onChunk
+        ? (chunk) => {
+            const clean = chunk.replace(/\|\|answer:\s*/g, "");
+            if (clean) onChunk(clean);
+          }
+        : undefined,
       onToken: () => { tokens++; },
       temperature: this.temperature,
       maxTokens,
     });
 
-    return { text, tokens, ms: Date.now() - start };
+    return { text: text.replace(/\|\|answer:\s*/g, ""), tokens, ms: Date.now() - start };
   }
 
   async dispose(): Promise<void> {
