@@ -110,7 +110,7 @@ export function clearLoading(loadMs: number, warmMs: number): void {
     chalk.cyan("/keys") +
     chalk.dim(" to get started.") +
     chalk.dim(`  (model ${(loadMs / 1000).toFixed(1)}s  ·  warmup ${(warmMs / 1000).toFixed(1)}s)`);
-  process.stdout.write("\r" + line + "\n\n");
+  process.stdout.write("\r" + line + "\n");
 }
 
 export function printGoodbye(): void {
@@ -141,8 +141,8 @@ export function startThinking(): () => void {
 }
 
 export const prompt = {
-  you: chalk.bold.green("You") + chalk.dim(" › "),
-  dream: chalk.bold.magenta("Dream") + chalk.dim(" › "),
+  you:   chalk.bold.green("›") + " ",
+  dream: chalk.bold.magenta("›") + " ",
 };
 
 export function printToolsList(): void {

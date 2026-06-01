@@ -40,9 +40,10 @@ export async function readInput(promptStr: string): Promise<string | null> {
     let cursorCol = 0;
     let selAnchor: SelPos | null = null;
 
-    // Track actual terminal rows (not logical lines) so line-wrap doesn't break cursor math.
-    let prevTermRows = 0;       // content rows from last render (excludes status bar)
-    let cursorRowAfterRender = 0; // 0-indexed terminal row where cursor sits after render
+    // prevTermRows = totalContentRows + 2  (top blank + content + bottom blank)
+    // cursorRowAfterRender = 1 + cursorTermRow  (offset for top blank row)
+    let prevTermRows = 0;
+    let cursorRowAfterRender = 0;
 
     let lastEscTime = 0;
     let inPaste = false;
@@ -124,39 +125,45 @@ export async function readInput(promptStr: string): Promise<string | null> {
       const tw = process.stdout.columns || 80;
       const available = Math.max(1, tw - promptLen);
 
-      let totalTermRows = 0;
+      let totalContentRows = 0;
       for (let i = 0; i < lines.length; i++) {
-        totalTermRows += lineTermRows(i, available, tw);
+        totalContentRows += lineTermRows(i, available, tw);
       }
+      const totalManagedRows = totalContentRows + 2; // top blank + content + bottom blank
 
-      // Jump back to the top of the input area
+      // Jump back to row 0 (top blank) of the managed area
       if (cursorRowAfterRender > 0) stdout.write(`\x1b[${cursorRowAfterRender}A`);
       stdout.write("\r");
 
-      // Redraw every logical line
+      // ── Row 0: top blank ──────────────────────────────────────────────
+      stdout.write("\x1b[0m\x1b[2K\r\n");
+
+      // ── Rows 1..N: content ────────────────────────────────────────────
       for (let i = 0; i < lines.length; i++) {
         stdout.write("\x1b[0m\x1b[2K\r");
         stdout.write(i === 0 ? promptStr + lineContent(i) : indent + lineContent(i));
-        // Clear to EOL so leftover chars from a previously longer/wrapped line don't remain
-        stdout.write("\x1b[K");
+        stdout.write("\x1b[K"); // clear leftover from a previously longer wrapped line
         if (i < lines.length - 1) stdout.write("\n");
       }
 
-      // Clear old content overflow AND the old status bar row.
-      // totalClear covers: (rows that disappeared) + 1 for the old status bar line.
-      const extra = prevTermRows - totalTermRows;
+      // ── Row N+1: bottom blank ────────────────────────────────────────
+      stdout.write("\n\x1b[0m\x1b[2K\r");
+
+      // Clear old overflow rows AND the old status bar row
+      const extra = prevTermRows - totalManagedRows;
       const totalClear = Math.max(0, extra) + (prevTermRows > 0 ? 1 : 0);
       for (let j = 0; j < totalClear; j++) stdout.write("\n\x1b[0m\x1b[2K\r");
       if (totalClear > 0) stdout.write(`\x1b[${totalClear}A`);
 
       stdout.write("\x1b[0m\r");
-      prevTermRows = totalTermRows;
+      prevTermRows = totalManagedRows;
 
-      // ── Status bar (always 1 row below last content row) ──────────────
+      // ── Status bar (1 row below bottom blank) ─────────────────────────
       stdout.write("\n\x1b[0m\x1b[2K\r  " + getStatusBar());
 
       // ── Cursor positioning ────────────────────────────────────────────
-      // We are now on the status bar row (prevTermRows). Go up to cursorTermRow.
+      // Content row cursorTermRow sits at managed-area row (1 + cursorTermRow).
+      // We are on the status bar row (totalManagedRows from top). Go up.
       let cursorTermRow = 0;
       for (let i = 0; i < cursorLine; i++) cursorTermRow += lineTermRows(i, available, tw);
       if (cursorCol > available) {
@@ -168,11 +175,12 @@ export async function readInput(promptStr: string): Promise<string | null> {
           ? promptLen + cursorCol
           : (cursorCol - available) % tw;
 
-      const up = totalTermRows - cursorTermRow; // from status bar row up to cursorTermRow
+      const targetRow = 1 + cursorTermRow; // +1 for top blank
+      const up = totalManagedRows - targetRow;
       if (up > 0) stdout.write(`\x1b[${up}A`);
       stdout.write(`\x1b[${cursorTermCol + 1}G`);
 
-      cursorRowAfterRender = cursorTermRow;
+      cursorRowAfterRender = targetRow;
     }
 
     function insertChar(ch: string): void {
@@ -206,11 +214,10 @@ export async function readInput(promptStr: string): Promise<string | null> {
       }
     }
 
-    // Move to the status bar row and clear it, ready for a final newline.
     function goToStatusBar(): void {
       const down = prevTermRows - cursorRowAfterRender;
       if (down > 0) stdout.write(`\x1b[${down}B`);
-      stdout.write("\x1b[0m\x1b[2K\r"); // clear status bar
+      stdout.write("\x1b[0m\x1b[2K\r");
     }
 
     function cleanup(): void {
@@ -220,9 +227,38 @@ export async function readInput(promptStr: string): Promise<string | null> {
       stdin.removeListener("data", onData);
     }
 
+    // Clear status bar, redraw input with white-background highlight, leave
+    // cursor on the bottom-blank row so the next output (thinking, response)
+    // starts right below the input without any extra gap.
+    function renderHighlightedAndLeave(): void {
+      goToStatusBar(); // cursor on cleared status bar row
+
+      // Go back to row 0 (top blank)
+      if (prevTermRows > 0) stdout.write(`\x1b[${prevTermRows}A`);
+      stdout.write("\r");
+
+      // Top blank
+      stdout.write("\x1b[0m\x1b[2K\r\n");
+
+      // Content with submitted highlight
+      const tw = process.stdout.columns || 80;
+      const available = Math.max(1, tw - promptLen);
+      for (let i = 0; i < lines.length; i++) {
+        stdout.write("\x1b[0m\x1b[2K\r");
+        const raw = lines[i];
+        const hl = raw.length > 0 ? chalk.bgWhite.black(raw) : "";
+        stdout.write(i === 0 ? promptStr + hl : indent + hl);
+        stdout.write("\x1b[0m\x1b[K");
+        if (i < lines.length - 1) stdout.write("\n");
+      }
+
+      // Bottom blank → cursor ends here; next output writes from this line
+      stdout.write("\n\x1b[0m\x1b[2K\r");
+    }
+
     function submit(): void {
       selAnchor = null;
-      goToStatusBar(); // cursor on cleared status bar row — response writes here directly
+      renderHighlightedAndLeave();
       cleanup();
       resolve(lines.join("\n"));
     }
@@ -247,7 +283,8 @@ export async function readInput(promptStr: string): Promise<string | null> {
 
         // Ctrl+C / Ctrl+D → exit
         if (ch === "\x03" || ch === "\x04") {
-          goToStatusBar();
+          selAnchor = null;
+          renderHighlightedAndLeave();
           cleanup();
           resolve(null);
           return;
@@ -287,7 +324,7 @@ export async function readInput(promptStr: string): Promise<string | null> {
             continue;
           }
 
-          // ── CSI sequences (\x1b[...) ──────────────────────────────────
+          // ── CSI sequences ──────────────────────────────────────────────
           if (rem.startsWith("\x1b[")) {
 
             // SELECT TO END: Shift+Ctrl/Alt+Down (6 chars)
@@ -317,38 +354,12 @@ export async function readInput(promptStr: string): Promise<string | null> {
             }
 
             // EXTEND SELECTION one step
-            if (rem.startsWith("\x1b[1;2B")) { // Shift+Down
-              if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol };
-              if (cursorLine < lines.length - 1) { cursorLine++; cursorCol = Math.min(cursorCol, lines[cursorLine].length); }
-              needRender = true; i += 6; continue;
-            }
-            if (rem.startsWith("\x1b[1;2A")) { // Shift+Up
-              if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol };
-              if (cursorLine > 0) { cursorLine--; cursorCol = Math.min(cursorCol, lines[cursorLine].length); }
-              needRender = true; i += 6; continue;
-            }
-            if (rem.startsWith("\x1b[1;2C")) { // Shift+Right
-              if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol };
-              if (cursorCol < lines[cursorLine].length) cursorCol++;
-              else if (cursorLine < lines.length - 1) { cursorLine++; cursorCol = 0; }
-              needRender = true; i += 6; continue;
-            }
-            if (rem.startsWith("\x1b[1;2D")) { // Shift+Left
-              if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol };
-              if (cursorCol > 0) cursorCol--;
-              else if (cursorLine > 0) { cursorLine--; cursorCol = lines[cursorLine].length; }
-              needRender = true; i += 6; continue;
-            }
-            if (rem.startsWith("\x1b[1;2F")) { // Shift+End
-              if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol };
-              cursorCol = lines[cursorLine].length;
-              needRender = true; i += 6; continue;
-            }
-            if (rem.startsWith("\x1b[1;2H")) { // Shift+Home
-              if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol };
-              cursorCol = 0;
-              needRender = true; i += 6; continue;
-            }
+            if (rem.startsWith("\x1b[1;2B")) { if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol }; if (cursorLine < lines.length - 1) { cursorLine++; cursorCol = Math.min(cursorCol, lines[cursorLine].length); } needRender = true; i += 6; continue; }
+            if (rem.startsWith("\x1b[1;2A")) { if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol }; if (cursorLine > 0) { cursorLine--; cursorCol = Math.min(cursorCol, lines[cursorLine].length); } needRender = true; i += 6; continue; }
+            if (rem.startsWith("\x1b[1;2C")) { if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol }; if (cursorCol < lines[cursorLine].length) cursorCol++; else if (cursorLine < lines.length - 1) { cursorLine++; cursorCol = 0; } needRender = true; i += 6; continue; }
+            if (rem.startsWith("\x1b[1;2D")) { if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol }; if (cursorCol > 0) cursorCol--; else if (cursorLine > 0) { cursorLine--; cursorCol = lines[cursorLine].length; } needRender = true; i += 6; continue; }
+            if (rem.startsWith("\x1b[1;2F")) { if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol }; cursorCol = lines[cursorLine].length; needRender = true; i += 6; continue; }
+            if (rem.startsWith("\x1b[1;2H")) { if (!selAnchor) selAnchor = { line: cursorLine, col: cursorCol }; cursorCol = 0; needRender = true; i += 6; continue; }
 
             // PLAIN NAVIGATION (clears selection)
             if (rem.startsWith("\x1b[A")) { selAnchor = null; if (cursorLine > 0) { cursorLine--; cursorCol = Math.min(cursorCol, lines[cursorLine].length); } needRender = true; i += 3; continue; }
@@ -357,19 +368,18 @@ export async function readInput(promptStr: string): Promise<string | null> {
             if (rem.startsWith("\x1b[D")) { selAnchor = null; if (cursorCol > 0) cursorCol--; else if (cursorLine > 0) { cursorLine--; cursorCol = lines[cursorLine].length; } needRender = true; i += 3; continue; }
             if (rem.startsWith("\x1b[H")) { selAnchor = null; cursorCol = 0; needRender = true; i += 3; continue; }
             if (rem.startsWith("\x1b[F")) { selAnchor = null; cursorCol = lines[cursorLine].length; needRender = true; i += 3; continue; }
-            if (rem.startsWith("\x1b[3~")) { // forward delete
+            if (rem.startsWith("\x1b[3~")) {
               if (selAnchor !== null) { deleteSelection(); }
               else if (cursorCol < lines[cursorLine].length) { lines[cursorLine] = lines[cursorLine].slice(0, cursorCol) + lines[cursorLine].slice(cursorCol + 1); }
               else if (cursorLine < lines.length - 1) { lines[cursorLine] += lines[cursorLine + 1]; lines.splice(cursorLine + 1, 1); }
               needRender = true; i += 4; continue;
             }
-            // Skip unknown CSI sequences
             const end = rem.slice(2).search(/[A-Za-z~]/);
             i += end >= 0 ? end + 3 : 2;
             continue;
           }
 
-          // SS3 sequences — clear selection on navigation
+          // SS3 sequences
           if (rem.startsWith("\x1bO")) {
             if (rem.startsWith("\x1bOH")) { selAnchor = null; cursorCol = 0; needRender = true; i += 3; continue; }
             if (rem.startsWith("\x1bOF")) { selAnchor = null; cursorCol = lines[cursorLine].length; needRender = true; i += 3; continue; }
