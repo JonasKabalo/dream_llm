@@ -1,9 +1,10 @@
-import { printToolsList } from "./ui.js";
+import { printToolsList, printKeys } from "./ui.js";
 
 type CommandHandler = () => void;
 
 const commands: Record<string, CommandHandler> = {
   "/tools-list": printToolsList,
+  "/keys":       printKeys,
 };
 
 export function isCommand(input: string): boolean {

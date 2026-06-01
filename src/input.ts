@@ -121,6 +121,9 @@ export async function readInput(promptStr: string): Promise<string | null> {
       for (let i = 0; i < lines.length; i++) {
         stdout.write("\x1b[0m\x1b[2K\r");
         stdout.write(i === 0 ? promptStr + lineContent(i) : indent + lineContent(i));
+        // Clear to EOL on the last terminal row of this logical line so that
+        // leftover characters from a previously longer/wrapped version don't remain.
+        stdout.write("\x1b[K");
         if (i < lines.length - 1) stdout.write("\n");
       }
 

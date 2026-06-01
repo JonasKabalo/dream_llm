@@ -106,7 +106,9 @@ export function clearLoading(loadMs: number, warmMs: number): void {
     chalk.bold("Ready") +
     chalk.dim("  ·  Type ") +
     chalk.cyan("/tools-list") +
-    chalk.dim(" to see what I can do.") +
+    chalk.dim(" or ") +
+    chalk.cyan("/keys") +
+    chalk.dim(" to get started.") +
     chalk.dim(`  (model ${(loadMs / 1000).toFixed(1)}s  ·  warmup ${(warmMs / 1000).toFixed(1)}s)`);
   process.stdout.write("\r" + line + "\n\n");
 }
@@ -164,21 +166,65 @@ export function printToolsList(): void {
       chalk.dim("  — " + section.subtitle),
     );
     console.log("  " + border);
-    console.log();
-
-    for (const tool of section.tools) {
-      const nameCol = pad(chalk.white.bold(tool.name), 28);
-      const exampleCol = tool.status
-        ? chalk.dim(tool.example) + "  " + chalk.dim.italic(tool.status)
-        : chalk.dim(tool.example);
-      console.log(`    ${tool.icon}  ${nameCol}${exampleCol}`);
-    }
-
+    const names = section.tools.map((t) => chalk.white.bold(t.name)).join(chalk.dim("  ·  "));
+    console.log("  " + names);
     console.log();
   }
 
   console.log("  " + border);
-  console.log("  " + chalk.dim("💡  Just describe what you want — Dream picks the right tool."));
-  console.log("  " + chalk.dim("📋  Commands: ") + chalk.cyan("/tools-list"));
+  console.log(
+    "  " + chalk.dim("💡  Just describe what you want — Dream picks the right tool.  ") +
+    chalk.cyan("/keys") + chalk.dim(" for shortcuts."),
+  );
+  console.log();
+}
+
+export function printKeys(): void {
+  const border = chalk.dim("─".repeat(WIDTH));
+  const title = "✦  DREAM — KEYBOARD SHORTCUTS  ✦";
+
+  console.log();
+  console.log(chalk.dim("  ╭" + "─".repeat(WIDTH) + "╮"));
+  console.log(
+    chalk.dim("  │") +
+    chalk.bold.cyan(title.padStart((WIDTH + title.length) / 2).padEnd(WIDTH)) +
+    chalk.dim("│"),
+  );
+  console.log(chalk.dim("  ╰" + "─".repeat(WIDTH) + "╯"));
+  console.log();
+
+  const row = (key: string, desc: string): void => {
+    console.log("  " + pad(chalk.cyan(key), 30) + chalk.dim(desc));
+  };
+
+  console.log("  " + chalk.bold("INPUT & EDITING"));
+  console.log("  " + border);
+  row("Enter",             "Send message to Dream");
+  row("Ctrl+J",            "Insert a new line");
+  row("ESC  ESC",          "Clear all input (double-tap within 400 ms)");
+  row("ESC",               "Cancel selection");
+  row("⌥⌫   /  Ctrl+W",   "Delete word backwards");
+  console.log();
+
+  console.log("  " + chalk.bold("SELECTION"));
+  console.log("  " + border);
+  row("Shift+↑  /  Shift+↓",   "Extend selection up / down one line");
+  row("Shift+←  /  Shift+→",   "Extend selection left / right one char");
+  row("Shift+Ctrl+↑",           "Select from cursor to start of input");
+  row("Shift+Ctrl+↓",           "Select from cursor to end of input");
+  row("Backspace",              "Delete selected text");
+  row("Type anything",          "Replace selected text");
+  console.log();
+
+  console.log("  " + chalk.bold("NAVIGATION"));
+  console.log("  " + border);
+  row("↑  ↓  ←  →",   "Move cursor (including across lines)");
+  row("Home  /  End",  "Jump to start / end of current line");
+  console.log();
+
+  console.log("  " + chalk.bold("COMMANDS"));
+  console.log("  " + border);
+  row("/tools-list",  "Show available tools");
+  row("/keys",        "Show this help");
   console.log();
 }
