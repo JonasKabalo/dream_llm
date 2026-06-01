@@ -4,8 +4,6 @@ import os from "os";
 import path from "path";
 import chalk from "chalk";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
-import { PROJECT_ROOT } from "../../config.js";
-
 const BLOCKED = [
   /rm\s+-rf\s+[/~]/,
   /rm\s+-rf\s+\*/,
@@ -16,8 +14,8 @@ const BLOCKED = [
   /chmod\s+-R\s+777\s+\//,
 ];
 
-// Remembered working directory — starts at the project root, persists for the session
-let currentCwd: string = PROJECT_ROOT;
+// Remembered working directory — starts where the user launched Dream, persists for the session
+let currentCwd: string = process.cwd();
 
 function isBlocked(cmd: string): boolean {
   return BLOCKED.some((re) => re.test(cmd));

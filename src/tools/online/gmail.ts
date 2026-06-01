@@ -203,11 +203,25 @@ export const gmailTools = {
       const headers = data.payload?.headers ?? [];
       const get = (name: string): string => headers.find((h) => h.name === name)?.value ?? "";
 
+      // Walk the MIME tree recursively to find the first text/plain part.
+      // Gmail wraps text/plain inside multipart/alternative inside multipart/mixed,
+      // so a flat find() on the top-level parts array misses nested plain-text parts.
+      type Part = { mimeType?: string | null; body?: { data?: string | null } | null; parts?: Part[] | null };
+      function findPlainText(part: Part): string | null {
+        if (part.mimeType === "text/plain" && part.body?.data) {
+          return Buffer.from(part.body.data, "base64").toString("utf-8");
+        }
+        for (const child of part.parts ?? []) {
+          const found = findPlainText(child);
+          if (found !== null) return found;
+        }
+        return null;
+      }
+
       let body = "";
-      const parts = data.payload?.parts ?? [];
-      const textPart = parts.find((p) => p.mimeType === "text/plain");
-      if (textPart?.body?.data) {
-        body = Buffer.from(textPart.body.data, "base64").toString("utf-8");
+      const walked = data.payload ? findPlainText(data.payload as Part) : null;
+      if (walked !== null) {
+        body = walked;
       } else if (data.payload?.body?.data) {
         body = Buffer.from(data.payload.body.data, "base64").toString("utf-8");
       }

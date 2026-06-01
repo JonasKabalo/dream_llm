@@ -1,20 +1,31 @@
 {
-  "name": "dream",
+  "name": "dream-local",
   "version": "1.0.0",
-  "description": "Local AI assistant powered by Phi-4 14B",
+  "description": "Your personal local AI assistant — Phi-4 14B, fully offline, runs on Apple Silicon",
+  "keywords": ["ai", "assistant", "llm", "phi-4", "offline", "cli", "local"],
+  "author": "Jonas Kabalo",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "dream": "./dist/main.js"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "start": "tsx src/main.ts",
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/main.js",
+    "prepublishOnly": "npm run build && npm run typecheck",
     "lint": "eslint src/**/*.ts",
     "typecheck": "tsc --noEmit",
     "setup": "tsx scripts/setup.ts",
     "setup-github": "tsx scripts/setup-github.ts",
     "setup-gmail": "tsx scripts/setup-gmail.ts"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "devDependencies": {
     "@types/node": "^25.9.1",
     "@typescript-eslint/eslint-plugin": "^8.60.0",

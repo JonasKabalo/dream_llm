@@ -35,7 +35,10 @@ export const dateutilsTools = {
         default: return `Unknown unit: "${unit}". Use days, weeks, months, or years.`;
       }
 
-      return `${formatFull(d)} (${d.toISOString().slice(0, 10)})`;
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${formatFull(d)} (${yyyy}-${mm}-${dd})`;
     },
   },
 

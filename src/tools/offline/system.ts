@@ -1,4 +1,5 @@
 import { execSync } from "child_process";
+import fs from "fs";
 import os from "os";
 import path from "path";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
@@ -58,6 +59,7 @@ export const systemTools = {
     handler({ filePath }: { filePath: string }): string {
       const resolved = filePath.replace(/^~/, os.homedir());
       const safe = path.resolve(resolved);
+      if (!fs.existsSync(safe)) return `Error: file not found at ${safe}`;
       execSync(`open "${safe.replace(/"/g, '\\"')}"`);
       return `Opened: ${safe}`;
     },

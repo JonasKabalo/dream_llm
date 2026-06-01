@@ -1,9 +1,8 @@
 import path from "path";
-import { fileURLToPath } from "url";
+import os from "os";
 import { createModelDownloader } from "node-llama-cpp";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const modelsDir = path.join(__dirname, "..", "models");
+const modelsDir = path.join(os.homedir(), ".dream", "models");
 
 console.log("Downloading Phi-4 14B Q4_K_M (~8.5GB)...");
 console.log("This may take a while depending on your connection.\n");
@@ -21,4 +20,5 @@ const downloader = await createModelDownloader({
 
 await downloader.download();
 
-console.log("\n\nModel ready. Run: npm start");
+console.log(`\n\nModel saved to ${modelsDir}`);
+console.log("Run: npm start  (or: dream)");

@@ -44,7 +44,7 @@ export const notesTools = {
       return files
         .map((f) => {
           const stat = fs.statSync(path.join(NOTES_DIR, f));
-          const title = f.replace(".md", "").replace(/-/g, " ");
+          const title = f.replace(/\.md$/, "").replace(/-/g, " ");
           return `• ${title}  (modified: ${stat.mtime.toLocaleDateString()})`;
         })
         .join("\n");
@@ -104,7 +104,7 @@ export const notesTools = {
       for (const f of files) {
         const content = fs.readFileSync(path.join(NOTES_DIR, f), "utf-8");
         if (content.toLowerCase().includes(lower)) {
-          const title = f.replace(".md", "").replace(/-/g, " ");
+          const title = f.replace(/\.md$/, "").replace(/-/g, " ");
           const line = content.split("\n").find((l) => l.toLowerCase().includes(lower)) ?? "";
           matches.push(`• ${title}: "${line.trim()}"`);
         }

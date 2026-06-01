@@ -55,7 +55,10 @@ export class DreamModel {
       functions,
       onTextChunk: onChunk
         ? (chunk) => {
-            const clean = chunk.replace(/\|\|answer:\s*/g, "");
+            const clean = chunk
+              .replace(/\|\|answer:\s*/g, "")
+              .replace(/\[(?:Result|List\s+contents?)\s+(?:of\s+)?[^\]]*\]\s*/g, "")
+              .replace(/\(Note:[^)]*\)\s*/g, "");
             if (clean) onChunk(clean);
           }
         : undefined,

@@ -57,22 +57,20 @@ export const filesystemTools = {
   },
 
   listDirectory: {
-    description: "List files and folders in a directory.",
+    description: "List files and folders in a directory. Omit dirPath to list the current working directory (equivalent to running 'ls').",
     params: {
       type: "object",
       properties: {
-        dirPath: { type: "string", description: "Absolute or ~ path" },
+        dirPath: { type: "string", description: "Absolute or ~ path. Omit to use the current directory." },
       },
-      required: ["dirPath"],
     } as const,
-    handler({ dirPath }: { dirPath: string }): string {
-      const resolved = safePath(dirPath);
+    handler({ dirPath }: { dirPath?: string }): string {
+      const resolved = dirPath ? safePath(dirPath) : process.cwd();
       if (!fs.existsSync(resolved)) return `Error: directory not found at ${resolved}`;
       const entries = fs.readdirSync(resolved, { withFileTypes: true });
-      if (entries.length === 0) return "(empty directory)";
-      return entries
-        .map((e) => `${e.isDirectory() ? "[dir] " : "[file]"} ${e.name}`)
-        .join("\n");
+      if (entries.length === 0) return `(empty directory: ${resolved})`;
+      const lines = entries.map((e) => `${e.isDirectory() ? "[dir] " : "[file]"} ${e.name}`);
+      return `Contents of ${resolved}:\n${lines.join("\n")}`;
     },
   },
 

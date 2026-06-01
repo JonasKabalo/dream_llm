@@ -27,6 +27,7 @@ export const githubTools = {
         per_page: 20,
         type: (type ?? "all") as "all" | "public" | "private",
       });
+      if (!data.length) return "No repositories found.";
       return data.map((r) => `${r.full_name}  [${r.private ? "private" : "public"}]  ${r.description ?? ""}`).join("\n");
     },
   },
@@ -69,6 +70,7 @@ export const githubTools = {
       const kit = octokit();
       const [repoOwner, repoName] = repo.includes("/") ? repo.split("/") : [owner(), repo];
       const { data } = await kit.repos.listBranches({ owner: repoOwner, repo: repoName, per_page: 30 });
+      if (!data.length) return "No branches found.";
       return data.map((b) => b.name).join("\n");
     },
   },
