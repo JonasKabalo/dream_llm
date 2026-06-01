@@ -107,8 +107,16 @@ Inside the assistant:
 | `Enter` | Send message to Dream |
 | `Ctrl+J` | Insert a new line (for multi-line messages) |
 | `ESC` `ESC` | Clear the entire input (double-tap within 400 ms) |
+| `ESC` | Cancel selection (single tap) |
 | `⌥⌫` or `Ctrl+W` | Delete the word behind the cursor |
 | `←` `→` `↑` `↓` | Move cursor (including across lines) |
+| `Shift+↑` / `Shift+↓` | Extend selection one line up/down |
+| `Shift+←` / `Shift+→` | Extend selection one character left/right |
+| `Shift+Ctrl+↑` / `Shift+⌥+↑` | Select from cursor to the **start** of input |
+| `Shift+Ctrl+↓` / `Shift+⌥+↓` | Select from cursor to the **end** of input |
+| `Shift+Home` / `Shift+End` | Extend selection to start/end of current line |
+| `Backspace` with selection | Delete selected text |
+| Type with selection | Replace selected text |
 | `Ctrl+C` / `Ctrl+D` | Exit Dream |
 
 Multi-line paste (with indented text and newlines) is handled automatically — paste anything and the full text appears as a single editable block before you send it.
