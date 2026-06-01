@@ -106,8 +106,6 @@ export function clearLoading(loadMs: number, warmMs: number): void {
     chalk.bold("Ready") +
     chalk.dim("  ·  Type ") +
     chalk.cyan("/tools-list") +
-    chalk.dim(" or ") +
-    chalk.cyan("/keys") +
     chalk.dim(" to get started.") +
     chalk.dim(`  (model ${(loadMs / 1000).toFixed(1)}s  ·  warmup ${(warmMs / 1000).toFixed(1)}s)`);
   process.stdout.write("\r" + line + "\n");
