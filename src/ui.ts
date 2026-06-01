@@ -69,7 +69,7 @@ export function printBanner(): void {
   console.log(chalk.dim("  │") + " ".repeat(WIDTH) + chalk.dim("│"));
   console.log(chalk.dim("  ╰" + "─".repeat(WIDTH) + "╯"));
   console.log();
-  console.log("  " + chalk.dim("Powered by Phi-4 14B  ·  Runs fully offline on M2"));
+  console.log("  " + chalk.dim("Powered by Phi-4 14B  ·  Runs fully offline"));
   console.log();
 }
 

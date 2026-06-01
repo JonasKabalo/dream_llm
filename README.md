@@ -1,6 +1,6 @@
 # Dream
 
-Your personal local AI assistant — powered by **Phi-4 14B**, running fully offline on Apple Silicon. No cloud. No subscription. No data leaving your machine.
+Your personal local AI assistant — powered by **Phi-4 14B**, running fully offline on your machine. No cloud. No subscription. No data leaving your machine.
 
 ---
 
@@ -29,7 +29,13 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 
 ## Requirements
 
-- Mac with Apple Silicon (M1 / M2 / M3 / M4)
+| Platform | Notes |
+|---|---|
+| **macOS** — Apple Silicon (M1/M2/M3/M4) | Metal GPU acceleration — best performance |
+| **macOS** — Intel | CPU inference — works, slower |
+| **Windows** 10 / 11 | CPU or CUDA (NVIDIA GPU recommended) |
+| **Linux** (Ubuntu 20.04+, Debian, etc.) | CPU or CUDA (NVIDIA GPU recommended) |
+
 - Node.js 18+
 - ~10 GB free disk space (for the model)
 
@@ -212,5 +218,5 @@ scripts/              local dev helpers (not shipped in npm package)
 ## Stack
 
 - **Model**: [Phi-4 14B Q4_K_M](https://huggingface.co/bartowski/phi-4-GGUF) by Microsoft
-- **Runtime**: [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) with Metal GPU acceleration
+- **Runtime**: [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) — Metal (macOS), CUDA (Windows/Linux), or CPU
 - **Language**: TypeScript (strict mode)
