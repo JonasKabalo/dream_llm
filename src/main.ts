@@ -1,10 +1,10 @@
-import readline from "readline";
 import fs from "fs";
 import { DreamModel } from "./model.js";
 import { Agent } from "./agent.js";
 import { MODEL_PATH, SYSTEM_PROMPT } from "./config.js";
 import { isCommand, runCommand } from "./commands.js";
 import { printBanner, startLoadingPhase, clearLoading, printGoodbye, printStats, startThinking, prompt } from "./ui.js";
+import { readInput } from "./input.js";
 
 async function main(): Promise<void> {
   if (!fs.existsSync(MODEL_PATH)) {
@@ -28,12 +28,6 @@ async function main(): Promise<void> {
 
   clearLoading(loadMs, warmMs);
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: process.stdin.isTTY ?? false,
-  });
-
   let isGenerating = false;
   let pendingExit = false;
 
@@ -43,51 +37,50 @@ async function main(): Promise<void> {
     process.exit(0);
   };
 
-  rl.on("close", () => {
-    if (isGenerating) { pendingExit = true; } else { cleanup(); }
-  });
-
+  // Handles Ctrl+C while the model is generating (raw mode is off during that time)
   process.on("SIGINT", () => {
     if (isGenerating) { pendingExit = true; } else { cleanup(); }
   });
 
-  const promptUser = (): void => {
-    rl.question(prompt.you, async (input: string) => {
-      const message = input.trim();
+  while (true) {
+    const input = await readInput(prompt.you);
 
-      if (!message) { promptUser(); return; }
+    // Ctrl+C / Ctrl+D during input
+    if (input === null) {
+      await cleanup();
+      return;
+    }
 
-      if (isCommand(message)) {
-        runCommand(message);
-        promptUser();
-        return;
+    const message = input.trim();
+    if (!message) continue;
+
+    if (isCommand(message)) {
+      runCommand(message);
+      continue;
+    }
+
+    isGenerating = true;
+
+    const stopThinking = startThinking();
+    let firstChunk = true;
+
+    const result = await agent.respond(message, (chunk) => {
+      if (firstChunk) {
+        stopThinking();
+        process.stdout.write(prompt.dream);
+        firstChunk = false;
       }
-
-      isGenerating = true;
-
-      const stopThinking = startThinking();
-      let firstChunk = true;
-
-      const result = await agent.respond(message, (chunk) => {
-        if (firstChunk) {
-          stopThinking();
-          process.stdout.write(prompt.dream);
-          firstChunk = false;
-        }
-        process.stdout.write(chunk);
-      });
-
-      if (firstChunk) stopThinking();
-
-      process.stdout.write("\n");
-      printStats(result.ms, result.tokens);
-      isGenerating = false;
-
-      if (pendingExit) { await cleanup(); } else { promptUser(); }
+      process.stdout.write(chunk);
     });
-  };
 
-  promptUser();
+    if (firstChunk) stopThinking();
+
+    process.stdout.write("\n");
+    printStats(result.ms, result.tokens);
+    isGenerating = false;
+
+    if (pendingExit) { await cleanup(); return; }
+  }
 }
 
 main().catch((err: unknown) => {

@@ -16,7 +16,7 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 | Open apps | "Open Spotify" / "Open ~/Desktop/report.pdf" |
 | Notes | "Save a note called Ideas" / "Show my notes" |
 | Date calculator | "What day is it in 3 weeks?" |
-| Terminal | "Run git status" — always asks confirmation first |
+| Terminal | "Run git status" — always asks confirmation, blocks destructive patterns |
 
 ### Online (require internet)
 | Tool | Example |
@@ -100,6 +100,19 @@ Inside the assistant:
 |---|---|
 | `/tools-list` | List all available tools |
 
+### Keyboard shortcuts
+
+| Key | What it does |
+|---|---|
+| `Enter` | Send message to Dream |
+| `Ctrl+J` | Insert a new line (for multi-line messages) |
+| `ESC` `ESC` | Clear the entire input (double-tap within 400 ms) |
+| `⌥⌫` or `Ctrl+W` | Delete the word behind the cursor |
+| `←` `→` `↑` `↓` | Move cursor (including across lines) |
+| `Ctrl+C` / `Ctrl+D` | Exit Dream |
+
+Multi-line paste (with indented text and newlines) is handled automatically — paste anything and the full text appears as a single editable block before you send it.
+
 ---
 
 ## Update
@@ -153,8 +166,9 @@ npm publish
 
 ```
 src/
-├── main.ts           entry point — CLI routing + REPL loop
-├── agent.ts          agent class
+├── main.ts           entry point — CLI loop
+├── input.ts          raw-mode input handler (multi-line, paste, keyboard shortcuts)
+├── agent.ts          agent — tool dispatch + smart directory context injection
 ├── model.ts          Phi-4 model wrapper (node-llama-cpp)
 ├── config.ts         model path, sender name, system prompt
 ├── credentials.ts    credential store (~/.dream/credentials.json)
@@ -173,7 +187,7 @@ src/
     │   ├── clipboard.ts
     │   ├── system.ts
     │   ├── notes.ts
-    │   └── terminal.ts
+    │   └── terminal.ts   command sanitizer + confirmation prompt + blocked-pattern list
     └── online/       requires internet
         ├── weather.ts
         ├── github.ts
