@@ -123,7 +123,6 @@ export function printStats(ms: number, tokens: number): void {
   console.log(
     "  " + chalk.dim(`⏱  ${secs}s  ·  ${tokens} tokens  ·  ${tps} tok/s`),
   );
-  console.log();
 }
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];

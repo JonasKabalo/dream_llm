@@ -222,8 +222,7 @@ export async function readInput(promptStr: string): Promise<string | null> {
 
     function submit(): void {
       selAnchor = null;
-      goToStatusBar();                 // cursor on cleared status bar row
-      stdout.write("\x1b[1A\x1b[0m\r\n"); // up to last content row, then newline
+      goToStatusBar(); // cursor on cleared status bar row — response writes here directly
       cleanup();
       resolve(lines.join("\n"));
     }
@@ -249,7 +248,6 @@ export async function readInput(promptStr: string): Promise<string | null> {
         // Ctrl+C / Ctrl+D → exit
         if (ch === "\x03" || ch === "\x04") {
           goToStatusBar();
-          stdout.write("\x1b[1A\x1b[0m\r\n");
           cleanup();
           resolve(null);
           return;
