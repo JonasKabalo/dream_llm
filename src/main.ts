@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import fs from "fs";
 import { DreamModel } from "./model.js";
 import { Agent } from "./agent.js";
