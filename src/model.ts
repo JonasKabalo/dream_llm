@@ -1,6 +1,7 @@
 import {
   getLlama,
   LlamaChatSession,
+  JinjaTemplateChatWrapper,
   type LlamaModel,
   type LlamaContext,
   type Llama,
@@ -25,18 +26,43 @@ export class DreamModel {
   private context: LlamaContext | null = null;
   private session: LlamaChatSession | null = null;
   private temperature: number = 0.7;
+  private systemPrompt: string = "";
+  private chatWrapper: JinjaTemplateChatWrapper | "auto" = "auto";
 
   async load(config: ModelConfig, systemPrompt: string): Promise<void> {
     this.temperature = config.temperature ?? 0.7;
+    this.systemPrompt = systemPrompt;
     this.llama = await getLlama();
     this.model = await this.llama.loadModel({ modelPath: config.modelPath });
     this.context = await this.model.createContext({
-      contextSize: config.contextSize ?? 4096,
+      contextSize: config.contextSize ?? 8192,
       flashAttention: true,
     });
+
+    const jinjaTemplate = this.model.fileInfo.metadata?.tokenizer?.chat_template;
+    this.chatWrapper = jinjaTemplate
+      ? new JinjaTemplateChatWrapper({
+          template: jinjaTemplate,
+          functionCallMessageTemplate: {
+            call: "[call: {{functionName}}({{functionParams}})]",
+            result: "\n[result: {{functionCallResult}}]\n",
+          },
+        })
+      : "auto";
+
     this.session = new LlamaChatSession({
       contextSequence: this.context.getSequence(),
       systemPrompt,
+      chatWrapper: this.chatWrapper,
+    });
+  }
+
+  private resetSession(): void {
+    if (!this.context) return;
+    this.session = new LlamaChatSession({
+      contextSequence: this.context.getSequence(),
+      systemPrompt: this.systemPrompt,
+      chatWrapper: this.chatWrapper,
     });
   }
 
@@ -51,23 +77,45 @@ export class DreamModel {
     let tokens = 0;
     const start = Date.now();
 
-    const text = await this.session.prompt(message, {
-      functions,
-      onTextChunk: onChunk
-        ? (chunk) => {
-            const clean = chunk
-              .replace(/\|\|answer:\s*/g, "")
-              .replace(/\[(?:Result|List\s+contents?)\s+(?:of\s+)?[^\]]*\]\s*/g, "")
-              .replace(/\(Note:[^)]*\)\s*/g, "");
-            if (clean) onChunk(clean);
-          }
-        : undefined,
-      onToken: () => { tokens++; },
-      temperature: this.temperature,
-      maxTokens,
-    });
+    const doPrompt = async (): Promise<string> =>
+      this.session!.prompt(message, {
+        functions,
+        onTextChunk: onChunk
+          ? (chunk) => {
+              const clean = chunk
+                .replace(/\|\|answer:\s*/g, "")
+                .replace(/\[call:\s*[^\]]*\]\s*/g, "")
+                .replace(/\[result:\s*[^\]]*\]\s*/g, "")
+                .replace(/\[(?:Result|List\s+contents?)\s+(?:of\s+)?[^\]]*\]\s*/g, "")
+                .replace(/\(Note:[^)]*\)\s*/g, "");
+              if (clean) onChunk(clean);
+            }
+          : undefined,
+        onToken: () => { tokens++; },
+        temperature: this.temperature,
+        maxTokens,
+      });
 
-    return { text: text.replace(/\|\|answer:\s*/g, ""), tokens, ms: Date.now() - start };
+    let text: string;
+    try {
+      text = await doPrompt();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("context shift strategy") || msg.includes("context size")) {
+        // Conversation history too long — clear it and retry with just this message
+        this.resetSession();
+        tokens = 0;
+        text = await doPrompt();
+      } else {
+        throw err;
+      }
+    }
+
+    const cleanText = text
+      .replace(/\|\|answer:\s*/g, "")
+      .replace(/\[call:\s*[^\]]*\]\s*/g, "")
+      .replace(/\[result:\s*[^\]]*\]\s*/g, "");
+    return { text: cleanText, tokens, ms: Date.now() - start };
   }
 
   async dispose(): Promise<void> {

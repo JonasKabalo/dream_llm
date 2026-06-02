@@ -3,6 +3,7 @@ import path from "path";
 import os from "os";
 import { DreamModel, type ChatMeta } from "./model.js";
 import { allTools } from "./tools/index.js";
+import { getCurrentCwd } from "./tools/offline/terminal.js";
 
 const WELL_KNOWN: Record<string, string> = {
   desktop:   path.join(os.homedir(), "Desktop"),
@@ -21,6 +22,8 @@ const WELL_KNOWN: Record<string, string> = {
 //   "ls in the Desktop" → ~/Desktop
 //   "ls ~/Downloads" / "ls /tmp" → absolute paths
 function resolveListingTarget(msg: string): string | null {
+  // "run ls", "execute ls", etc. → let the model use runTerminalCommand instead
+  if (/\b(run|execute|call)\b.{0,15}\bls\b/i.test(msg)) return null;
   if (!/\b(ls|list\b|show\s+me\s+the|what.{0,20}(in|inside))/i.test(msg)) return null;
 
   // Explicit ~/path or /absolute/path
@@ -43,8 +46,8 @@ function resolveListingTarget(msg: string): string | null {
     if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) return resolved;
   }
 
-  // No specific path → current directory
-  return process.cwd();
+  // No specific path → terminal's tracked working directory
+  return getCurrentCwd();
 }
 
 function buildListingContext(msg: string): string | null {

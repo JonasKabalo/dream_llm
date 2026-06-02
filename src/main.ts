@@ -7,6 +7,8 @@ import { isCommand, runCommand } from "./commands.js";
 import { printBanner, startLoadingPhase, clearLoading, printGoodbye, printStats, startThinking, prompt } from "./ui.js";
 import { readInput } from "./input.js";
 
+let activeModel: DreamModel | null = null;
+
 async function main(): Promise<void> {
   if (!fs.existsSync(MODEL_PATH)) {
     console.error(`Model not found at: ${MODEL_PATH}`);
@@ -18,6 +20,7 @@ async function main(): Promise<void> {
 
   const stopLoading = startLoadingPhase("Loading model");
   const model = new DreamModel();
+  activeModel = model;
   await model.load({ modelPath: MODEL_PATH }, SYSTEM_PROMPT);
   const loadMs = stopLoading();
 
@@ -65,26 +68,34 @@ async function main(): Promise<void> {
     const stopThinking = startThinking();
     let firstChunk = true;
 
-    const result = await agent.respond(message, (chunk) => {
-      if (firstChunk) {
-        stopThinking();
-        process.stdout.write(prompt.dream);
-        firstChunk = false;
-      }
-      process.stdout.write(chunk);
-    });
+    try {
+      const result = await agent.respond(message, (chunk) => {
+        if (firstChunk) {
+          stopThinking();
+          process.stdout.write(prompt.dream);
+          firstChunk = false;
+        }
+        process.stdout.write(chunk);
+      });
 
-    if (firstChunk) stopThinking();
+      if (firstChunk) stopThinking();
+      process.stdout.write("\n");
+      printStats(result.ms, result.tokens);
+    } catch (err: unknown) {
+      if (firstChunk) stopThinking();
+      process.stdout.write("\n");
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`  Error: ${msg}\n`);
+    }
 
-    process.stdout.write("\n");
-    printStats(result.ms, result.tokens);
     isGenerating = false;
 
     if (pendingExit) { await cleanup(); return; }
   }
 }
 
-main().catch((err: unknown) => {
+main().catch(async (err: unknown) => {
   console.error("Fatal error:", err);
+  if (activeModel) await activeModel.dispose().catch(() => {});
   process.exit(1);
 });

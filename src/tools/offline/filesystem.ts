@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
+import { getCurrentCwd } from "./terminal.js";
 
 const HOME = os.homedir();
 
@@ -65,7 +66,7 @@ export const filesystemTools = {
       },
     } as const,
     handler({ dirPath }: { dirPath?: string }): string {
-      const resolved = dirPath ? safePath(dirPath) : process.cwd();
+      const resolved = dirPath ? safePath(dirPath) : getCurrentCwd();
       if (!fs.existsSync(resolved)) return `Error: directory not found at ${resolved}`;
       const entries = fs.readdirSync(resolved, { withFileTypes: true });
       if (entries.length === 0) return `(empty directory: ${resolved})`;

@@ -17,6 +17,10 @@ const BLOCKED = [
 // Remembered working directory — starts where the user launched Dream, persists for the session
 let currentCwd: string = process.cwd();
 
+export function getCurrentCwd(): string {
+  return currentCwd;
+}
+
 function isBlocked(cmd: string): boolean {
   return BLOCKED.some((re) => re.test(cmd));
 }
