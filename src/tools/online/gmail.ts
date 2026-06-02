@@ -1,6 +1,7 @@
+import fs from "fs";
 import { google } from "googleapis";
 import { getGmailCreds, saveCredentials } from "../../credentials.js";
-import { SENDER_NAME } from "../../config.js";
+import { SENDER_NAME, CV_PATH } from "../../config.js";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
 
 function getClient(): ReturnType<typeof google.gmail> {
@@ -29,7 +30,7 @@ function getClient(): ReturnType<typeof google.gmail> {
 }
 
 const GREETING_PATTERNS = /^(hi|hello|dear|bonjour|salut)[,\s]/i;
-const CLOSING_PATTERNS = /kind regards|best regards|cordialement|sincèrement/i;
+const CLOSING_PATTERNS = /\b(kind|warm|best|many)\s+regards|warm\s+wishes|best\s+wishes|yours\s+sincerely|sincerely\s+yours|sincerely|cordially|cordialement|sincèrement|amicalement/i;
 
 function recipientFirstName(to: string): string {
   const local = to.split("@")[0];
@@ -61,7 +62,7 @@ function formatBody(body: string, to: string): string {
   }
 
   if (CLOSING_PATTERNS.test(result)) {
-    result = result.replace(/\n*(kind regards|best regards|cordialement|sincèrement)[\s\S]*/gi, "").trimEnd();
+    result = result.replace(/\n*(\b(kind|warm|best|many)\s+regards|warm\s+wishes|best\s+wishes|yours\s+sincerely|sincerely\s+yours|sincerely|cordially|cordialement|sincèrement|amicalement)[\s\S]*/gi, "").trimEnd();
   }
 
   const name = senderName();
@@ -85,72 +86,126 @@ function toHtml(text: string): string {
     .join("\n");
 }
 
-function encodeMail(to: string, subject: string, body: string, from?: string): string {
+function encodeMail(to: string, subject: string, body: string, attachCv?: boolean, from?: string): string {
   const formatted = formatBody(body, to);
-  const lines = [
+  const htmlBody = toHtml(formatted);
+
+  const cvBuffer = attachCv && fs.existsSync(CV_PATH) ? fs.readFileSync(CV_PATH) : null;
+
+  if (!cvBuffer) {
+    const lines = [
+      from ? `From: ${from}` : "",
+      `To: ${to}`,
+      `Subject: ${encodeSubject(subject)}`,
+      "MIME-Version: 1.0",
+      "Content-Type: text/html; charset=utf-8",
+      "",
+      htmlBody,
+    ].filter((l, i) => i !== 0 || l !== "");
+    return Buffer.from(lines.join("\r\n")).toString("base64url");
+  }
+
+  const boundary = `dream_boundary_${Date.now()}`;
+  const cvName = "CV_Jonas_Kabalo.pdf";
+  const cvBase64 = cvBuffer.toString("base64");
+
+  const parts = [
+    `--${boundary}`,
+    "Content-Type: text/html; charset=utf-8",
+    "",
+    htmlBody,
+    "",
+    `--${boundary}`,
+    `Content-Type: application/pdf; name="${cvName}"`,
+    `Content-Disposition: attachment; filename="${cvName}"`,
+    "Content-Transfer-Encoding: base64",
+    "",
+    cvBase64,
+    `--${boundary}--`,
+  ].join("\r\n");
+
+  const headers = [
     from ? `From: ${from}` : "",
     `To: ${to}`,
     `Subject: ${encodeSubject(subject)}`,
     "MIME-Version: 1.0",
-    "Content-Type: text/html; charset=utf-8",
+    `Content-Type: multipart/mixed; boundary="${boundary}"`,
     "",
-    toHtml(formatted),
+    parts,
   ].filter((l, i) => i !== 0 || l !== "");
-  return Buffer.from(lines.join("\r\n")).toString("base64url");
+
+  return Buffer.from(headers.join("\r\n")).toString("base64url");
 }
 
 export const gmailTools = {
   previewEmail: {
-    description: "Preview how an email will look once formatted, WITHOUT sending it. Always call this before sendEmail so the user can confirm.",
+    description: "Preview how an email will look once formatted, WITHOUT sending it. Always call this before sendEmail so the user can confirm. Set attachCv: true to indicate the CV will be attached.",
     params: {
       type: "object",
       properties: {
         to: { type: "string", description: "Recipient email" },
         subject: { type: "string", description: "Subject line" },
-        body: { type: "string", description: "Plain text body" },
+        body: { type: "string", description: "Plain text body (no sign-off — it is added automatically)" },
+        attachCv: { type: "boolean", description: "Set true to attach the stored CV (~/. dream/cv.pdf)" },
       },
       required: ["to", "subject", "body"],
     } as const,
-    handler({ to, subject, body }: { to: string; subject: string; body: string }): string {
-      return `To: ${to}\nSubject: ${subject}\n\n${formatBody(body, to)}`;
+    handler({ to, subject, body, attachCv }: { to: string; subject: string; body: string; attachCv?: boolean }): string {
+      let preview = `To: ${to}\nSubject: ${subject}\n`;
+      if (attachCv) {
+        const cvStatus = fs.existsSync(CV_PATH) ? `Attachment: CV_Jonas_Kabalo.pdf` : `Attachment: CV not found at ${CV_PATH} — call importCV first`;
+        preview += `${cvStatus}\n`;
+      }
+      preview += `\n${formatBody(body, to)}`;
+      return preview;
     },
   },
 
   sendEmail: {
-    description: "Send an email via Gmail. Only call this after showing a previewEmail and getting the user's confirmation.",
+    description: "Send an email via Gmail. Only call this after showing a previewEmail and getting the user's confirmation. Set attachCv: true to attach the stored CV.",
     params: {
       type: "object",
       properties: {
         to: { type: "string", description: "Recipient email" },
         subject: { type: "string", description: "Subject line" },
-        body: { type: "string", description: "Plain text body" },
+        body: { type: "string", description: "Plain text body (no sign-off — it is added automatically)" },
+        attachCv: { type: "boolean", description: "Set true to attach the stored CV (~/.dream/cv.pdf)" },
       },
       required: ["to", "subject", "body"],
     } as const,
-    async handler({ to, subject, body }: { to: string; subject: string; body: string }): Promise<string> {
+    async handler({ to, subject, body, attachCv }: { to: string; subject: string; body: string; attachCv?: boolean }): Promise<string> {
+      if (attachCv && !fs.existsSync(CV_PATH)) {
+        return `Error: CV not found at ${CV_PATH}. Ask the user for their CV file path and call importCV to set it up first.`;
+      }
       const gmail = getClient();
-      const raw = encodeMail(to, subject, body);
+      const raw = encodeMail(to, subject, body, attachCv);
       const { data } = await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
-      return `Email sent. Message ID: ${data.id}`;
+      const suffix = attachCv ? " (CV attached)" : "";
+      return `Email sent${suffix}. Message ID: ${data.id}`;
     },
   },
 
   createDraft: {
-    description: "Save an email as a Gmail draft without sending.",
+    description: "Save an email as a Gmail draft without sending. Set attachCv: true to attach the stored CV.",
     params: {
       type: "object",
       properties: {
         to: { type: "string", description: "Recipient email" },
         subject: { type: "string", description: "Subject line" },
-        body: { type: "string", description: "Plain text body" },
+        body: { type: "string", description: "Plain text body (no sign-off — it is added automatically)" },
+        attachCv: { type: "boolean", description: "Set true to attach the stored CV (~/.dream/cv.pdf)" },
       },
       required: ["to", "subject", "body"],
     } as const,
-    async handler({ to, subject, body }: { to: string; subject: string; body: string }): Promise<string> {
+    async handler({ to, subject, body, attachCv }: { to: string; subject: string; body: string; attachCv?: boolean }): Promise<string> {
+      if (attachCv && !fs.existsSync(CV_PATH)) {
+        return `Error: CV not found at ${CV_PATH}. Ask the user for their CV file path and call importCV to set it up first.`;
+      }
       const gmail = getClient();
-      const raw = encodeMail(to, subject, body);
+      const raw = encodeMail(to, subject, body, attachCv);
       const { data } = await gmail.users.drafts.create({ userId: "me", requestBody: { message: { raw } } });
-      return `Draft saved. Draft ID: ${data.id}`;
+      const suffix = attachCv ? " (CV attached)" : "";
+      return `Draft saved${suffix}. Draft ID: ${data.id}`;
     },
   },
 

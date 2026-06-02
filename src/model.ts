@@ -4,6 +4,7 @@ import {
   JinjaTemplateChatWrapper,
   type LlamaModel,
   type LlamaContext,
+  type LlamaContextSequence,
   type Llama,
   type ChatSessionModelFunctions,
 } from "node-llama-cpp";
@@ -24,6 +25,7 @@ export class DreamModel {
   private llama: Llama | null = null;
   private model: LlamaModel | null = null;
   private context: LlamaContext | null = null;
+  private sequence: LlamaContextSequence | null = null;
   private session: LlamaChatSession | null = null;
   private temperature: number = 0.7;
   private systemPrompt: string = "";
@@ -50,8 +52,9 @@ export class DreamModel {
         })
       : "auto";
 
+    this.sequence = this.context.getSequence();
     this.session = new LlamaChatSession({
-      contextSequence: this.context.getSequence(),
+      contextSequence: this.sequence,
       systemPrompt,
       chatWrapper: this.chatWrapper,
     });
@@ -59,8 +62,12 @@ export class DreamModel {
 
   private resetSession(): void {
     if (!this.context) return;
+    // Dispose the old sequence so its slot is returned to the context before allocating a new one.
+    // Without this, getSequence() throws "No sequences left" because the context only has one slot.
+    try { this.sequence?.dispose(); } catch { /* ignore */ }
+    this.sequence = this.context.getSequence();
     this.session = new LlamaChatSession({
-      contextSequence: this.context.getSequence(),
+      contextSequence: this.sequence,
       systemPrompt: this.systemPrompt,
       chatWrapper: this.chatWrapper,
     });
@@ -119,6 +126,7 @@ export class DreamModel {
   }
 
   async dispose(): Promise<void> {
+    try { this.sequence?.dispose(); } catch { /* ignore */ }
     this.context?.dispose();
     this.model?.dispose();
     await this.llama?.dispose();

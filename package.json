@@ -2,7 +2,15 @@
   "name": "dream-local",
   "version": "1.0.0",
   "description": "Your personal local AI assistant — Phi-4 14B, fully offline, runs on Apple Silicon",
-  "keywords": ["ai", "assistant", "llm", "phi-4", "offline", "cli", "local"],
+  "keywords": [
+    "ai",
+    "assistant",
+    "llm",
+    "phi-4",
+    "offline",
+    "cli",
+    "local"
+  ],
   "author": "Jonas Kabalo",
   "license": "MIT",
   "type": "module",
@@ -38,6 +46,7 @@
     "@octokit/rest": "^22.0.1",
     "chalk": "^5.6.2",
     "googleapis": "^172.0.0",
-    "node-llama-cpp": "^3.18.1"
+    "node-llama-cpp": "^3.18.1",
+    "pdf-parse": "^2.4.5"
   }
 }

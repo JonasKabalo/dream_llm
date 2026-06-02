@@ -1,8 +1,10 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { PDFParse } from "pdf-parse";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
 import { getCurrentCwd } from "./terminal.js";
+import { CV_PATH } from "../../config.js";
 
 const HOME = os.homedir();
 
@@ -40,7 +42,7 @@ export const filesystemTools = {
   },
 
   readFile: {
-    description: "Read a file's text content.",
+    description: "Read a file's text content. Supports plain text and PDF files.",
     params: {
       type: "object",
       properties: {
@@ -48,10 +50,24 @@ export const filesystemTools = {
       },
       required: ["filePath"],
     } as const,
-    handler({ filePath }: { filePath: string }): string {
+    async handler({ filePath }: { filePath: string }): Promise<string> {
       const resolved = safePath(filePath);
       if (!fs.existsSync(resolved)) return `Error: file not found at ${resolved}`;
       const stat = fs.statSync(resolved);
+
+      if (resolved.toLowerCase().endsWith(".pdf")) {
+        if (stat.size > 10 * 1024 * 1024) return `Error: PDF too large (${(stat.size / 1024 / 1024).toFixed(1)} MB). Max 10 MB.`;
+        const buf = fs.readFileSync(resolved);
+        const parser = new PDFParse({ data: new Uint8Array(buf) });
+        try {
+          const result = await parser.getText();
+          const text = result.text.trim();
+          return text || "(no text content found in PDF)";
+        } finally {
+          await parser.destroy().catch(() => {});
+        }
+      }
+
       if (stat.size > 100_000) return `Error: file too large to read (${stat.size} bytes). Max 100KB.`;
       return fs.readFileSync(resolved, "utf-8");
     },
@@ -194,7 +210,7 @@ export const filesystemTools = {
   },
 
   searchFiles: {
-    description: "Find files by name inside a directory (case-insensitive substring match).",
+    description: "Find files by name inside a directory (case-insensitive substring match). Max depth 5, stops after 5 seconds. Does NOT search for CV/resume files — use checkCV for that.",
     params: {
       type: "object",
       properties: {
@@ -210,21 +226,27 @@ export const filesystemTools = {
       const limit = maxResults ?? 20;
       const results: string[] = [];
       const lower = pattern.toLowerCase();
+      const deadline = Date.now() + 5_000;
+      const SKIP = new Set(["node_modules", "Library", "System", "Applications", "dist", "build", ".git", ".cache", ".npm", ".yarn", ".pnpm-store"]);
 
-      function walk(dir: string): void {
-        if (results.length >= limit) return;
+      function walk(dir: string, depth: number): void {
+        if (results.length >= limit || Date.now() > deadline || depth > 5) return;
         let entries: fs.Dirent[];
         try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
         for (const entry of entries) {
-          if (results.length >= limit) break;
+          if (results.length >= limit || Date.now() > deadline) break;
           const full = path.join(dir, entry.name);
           if (entry.name.toLowerCase().includes(lower)) results.push(full);
-          if (entry.isDirectory() && !entry.name.startsWith(".")) walk(full);
+          if (entry.isDirectory() && !entry.name.startsWith(".") && !SKIP.has(entry.name)) {
+            walk(full, depth + 1);
+          }
         }
       }
 
-      walk(resolved);
-      return results.length ? results.join("\n") : `No files matching "${pattern}" found in ${resolved}`;
+      walk(resolved, 0);
+      const timedOut = Date.now() > deadline;
+      if (results.length === 0) return `No files matching "${pattern}" found in ${resolved}${timedOut ? " (search timed out)" : ""}`;
+      return results.join("\n") + (timedOut ? "\n(search timed out — results may be incomplete)" : "");
     },
   },
 
@@ -262,6 +284,41 @@ export const filesystemTools = {
 
       fs.writeFileSync(resolved, updated, "utf-8");
       return `Replaced ${count} occurrence${count !== 1 ? "s" : ""} in ${resolved}`;
+    },
+  },
+
+  importCV: {
+    description: "Copy a CV/resume file from any local path into ~/.dream/cv.pdf so it can be attached to emails. Call this when the user wants to set up or update their CV, or when attachCv is needed but no CV is stored yet.",
+    params: {
+      type: "object",
+      properties: {
+        sourcePath: { type: "string", description: "Absolute or ~ path to the CV file (PDF, DOCX, etc.)" },
+      },
+      required: ["sourcePath"],
+    } as const,
+    handler({ sourcePath }: { sourcePath: string }): string {
+      const src = safePath(sourcePath);
+      if (!fs.existsSync(src)) return `Error: file not found at ${src}`;
+      const stat = fs.statSync(src);
+      if (stat.isDirectory()) return `Error: ${src} is a directory, not a file.`;
+      if (stat.size > 10 * 1024 * 1024) return `Error: file is too large (${(stat.size / 1024 / 1024).toFixed(1)} MB). Max 10MB.`;
+      fs.mkdirSync(path.dirname(CV_PATH), { recursive: true });
+      fs.copyFileSync(src, CV_PATH);
+      const kb = (stat.size / 1024).toFixed(1);
+      return `CV saved to ${CV_PATH} (${kb} KB). It will be attached to emails when attachCv is true.`;
+    },
+  },
+
+  checkCV: {
+    description: "Check whether a CV is stored and ready to attach to emails.",
+    params: { type: "object", properties: {} } as const,
+    handler(): string {
+      if (!fs.existsSync(CV_PATH)) {
+        return `No CV found at ${CV_PATH}. Ask the user for their CV file path and call importCV to set it up.`;
+      }
+      const stat = fs.statSync(CV_PATH);
+      const kb = (stat.size / 1024).toFixed(1);
+      return `CV ready at ${CV_PATH} (${kb} KB, last modified ${stat.mtime.toLocaleDateString()}).`;
     },
   },
 } satisfies ChatSessionModelFunctions;

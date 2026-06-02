@@ -40,10 +40,10 @@ export async function readInput(promptStr: string): Promise<string | null> {
     let cursorCol = 0;
     let selAnchor: SelPos | null = null;
 
-    // prevTermRows = totalContentRows + 2  (top blank + content + bottom blank)
-    // cursorRowAfterRender = 1 + cursorTermRow  (offset for top blank row)
     let prevTermRows = 0;
     let cursorRowAfterRender = 0;
+    // First logical line index shown in the viewport. render() keeps cursorLine visible.
+    let viewportStart = 0;
 
     let lastEscTime = 0;
     let inPaste = false;
@@ -121,33 +121,74 @@ export async function readInput(promptStr: string): Promise<string | null> {
       selAnchor  = null;
     }
 
+    // Compute which logical lines are visible in the current viewport.
+    // The terminal has `th` rows. We reserve 3 for top blank, bottom blank,
+    // and status bar, so at most (th - 3) rows can hold content.
+    // viewportStart is adjusted (as a side effect) so cursorLine is always
+    // within the returned visible set.
+    function computeViewport(tw: number, available: number): {
+      visible: number[];
+      totalContentRows: number;
+    } {
+      const th = process.stdout.rows || 24;
+      const maxContentRows = Math.max(1, th - 3);
+
+      // viewportStart must not exceed cursorLine
+      if (viewportStart > cursorLine) viewportStart = cursorLine;
+
+      // Advance viewportStart until cursorLine fits within maxContentRows
+      let rowsToCursor = 0;
+      for (let i = viewportStart; i <= cursorLine; i++) {
+        rowsToCursor += lineTermRows(i, available, tw);
+      }
+      while (rowsToCursor > maxContentRows && viewportStart < cursorLine) {
+        rowsToCursor -= lineTermRows(viewportStart, available, tw);
+        viewportStart++;
+      }
+
+      // Collect lines from viewportStart until we exceed maxContentRows
+      const visible: number[] = [];
+      let totalContentRows = 0;
+      for (let i = viewportStart; i < lines.length; i++) {
+        const lr = lineTermRows(i, available, tw);
+        if (totalContentRows + lr > maxContentRows) break;
+        visible.push(i);
+        totalContentRows += lr;
+      }
+
+      return { visible, totalContentRows };
+    }
+
     function render(): void {
       const tw = process.stdout.columns || 80;
       const available = Math.max(1, tw - promptLen);
 
-      let totalContentRows = 0;
-      for (let i = 0; i < lines.length; i++) {
-        totalContentRows += lineTermRows(i, available, tw);
-      }
+      const { visible, totalContentRows } = computeViewport(tw, available);
       const totalManagedRows = totalContentRows + 2; // top blank + content + bottom blank
 
       // Jump back to row 0 (top blank) of the managed area
       if (cursorRowAfterRender > 0) stdout.write(`\x1b[${cursorRowAfterRender}A`);
       stdout.write("\r");
 
-      // ── Row 0: top blank ──────────────────────────────────────────────
-      stdout.write("\x1b[0m\x1b[2K\r\n");
+      // ── Row 0: top blank (scroll indicator when content is above) ─────────
+      stdout.write("\x1b[0m\x1b[2K\r");
+      if (viewportStart > 0) stdout.write(chalk.dim("  ↑ scroll up for more"));
+      stdout.write("\n");
 
-      // ── Rows 1..N: content ────────────────────────────────────────────
-      for (let i = 0; i < lines.length; i++) {
+      // ── Rows 1..N: visible content ─────────────────────────────────────
+      for (let idx = 0; idx < visible.length; idx++) {
+        const i = visible[idx];
         stdout.write("\x1b[0m\x1b[2K\r");
         stdout.write(i === 0 ? promptStr + lineContent(i) : indent + lineContent(i));
-        stdout.write("\x1b[K"); // clear leftover from a previously longer wrapped line
-        if (i < lines.length - 1) stdout.write("\n");
+        stdout.write("\x1b[K");
+        if (idx < visible.length - 1) stdout.write("\n");
       }
 
-      // ── Row N+1: bottom blank ────────────────────────────────────────
+      // ── Row N+1: bottom blank (scroll indicator when content is below) ───
+      const lastVisible = visible.length > 0 ? visible[visible.length - 1] : -1;
+      const hasMore = lastVisible >= 0 && lastVisible < lines.length - 1;
       stdout.write("\n\x1b[0m\x1b[2K\r");
+      if (hasMore) stdout.write(chalk.dim("  ↓ scroll down for more"));
 
       // Clear old overflow rows AND the old status bar row
       const extra = prevTermRows - totalManagedRows;
@@ -162,10 +203,8 @@ export async function readInput(promptStr: string): Promise<string | null> {
       stdout.write("\n\x1b[0m\x1b[2K\r  " + getStatusBar());
 
       // ── Cursor positioning ────────────────────────────────────────────
-      // Content row cursorTermRow sits at managed-area row (1 + cursorTermRow).
-      // We are on the status bar row (totalManagedRows from top). Go up.
       let cursorTermRow = 0;
-      for (let i = 0; i < cursorLine; i++) cursorTermRow += lineTermRows(i, available, tw);
+      for (let i = viewportStart; i < cursorLine; i++) cursorTermRow += lineTermRows(i, available, tw);
       if (cursorCol > available) {
         cursorTermRow += 1 + Math.floor((cursorCol - available) / tw);
       }
@@ -227,9 +266,8 @@ export async function readInput(promptStr: string): Promise<string | null> {
       stdin.removeListener("data", onData);
     }
 
-    // Clear status bar, redraw input with white-background highlight, leave
-    // cursor on the bottom-blank row so the next output (thinking, response)
-    // starts right below the input without any extra gap.
+    // Clear status bar, redraw visible input with white-background highlight,
+    // leave cursor on the bottom-blank row so the next output starts right below.
     function renderHighlightedAndLeave(): void {
       goToStatusBar(); // cursor on cleared status bar row
 
@@ -237,19 +275,22 @@ export async function readInput(promptStr: string): Promise<string | null> {
       if (prevTermRows > 0) stdout.write(`\x1b[${prevTermRows}A`);
       stdout.write("\r");
 
+      const tw = process.stdout.columns || 80;
+      const available = Math.max(1, tw - promptLen);
+      const { visible } = computeViewport(tw, available);
+
       // Top blank
       stdout.write("\x1b[0m\x1b[2K\r\n");
 
-      // Content with submitted highlight
-      const tw = process.stdout.columns || 80;
-      const available = Math.max(1, tw - promptLen);
-      for (let i = 0; i < lines.length; i++) {
+      // Visible content with submitted highlight
+      for (let idx = 0; idx < visible.length; idx++) {
+        const i = visible[idx];
         stdout.write("\x1b[0m\x1b[2K\r");
         const raw = lines[i];
         const hl = raw.length > 0 ? chalk.bgWhite.black(raw) : "";
         stdout.write(i === 0 ? promptStr + hl : indent + hl);
         stdout.write("\x1b[0m\x1b[K");
-        if (i < lines.length - 1) stdout.write("\n");
+        if (idx < visible.length - 1) stdout.write("\n");
       }
 
       // Bottom blank → cursor ends here; next output writes from this line
@@ -395,6 +436,7 @@ export async function readInput(promptStr: string): Promise<string | null> {
           if (now - lastEscTime < 400) {
             lines.length = 1; lines[0] = "";
             cursorLine = 0; cursorCol = 0; selAnchor = null;
+            viewportStart = 0;
           } else {
             selAnchor = null;
           }
