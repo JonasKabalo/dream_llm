@@ -99,6 +99,8 @@ you  › find Ryan Lockyer at Leo Technology
 dream › [calls findContact] → Name: Ryan Lockyer / Email: ryan@leotechnology.com / Title: Founder & Director
 ```
 
+> **Note:** Contact search (`findContact`, `searchPeople`) requires a **Basic plan or higher** on Apollo.io. The free plan does not include API access to people search. The setup wizard works on any plan and will save your key — the tools will return a clear upgrade prompt if your plan doesn't cover the endpoint.
+
 ### GitHub
 ```bash
 dream setup-github
@@ -127,6 +129,7 @@ Type `/tools-list` at any time to see all available tools with examples.
 | `dream setup` | Download the AI model |
 | `dream setup-gmail` | Connect your Gmail account |
 | `dream setup-github` | Connect your GitHub account |
+| `dream setup-apollo` | Connect your Apollo.io account |
 | `dream update` | Update to the latest version |
 | `dream version` | Show the installed version |
 
