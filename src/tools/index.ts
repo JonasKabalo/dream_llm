@@ -11,6 +11,7 @@ import { terminalTools } from "./offline/terminal.js";
 import { weatherTools } from "./online/weather.js";
 import { githubTools } from "./online/github.js";
 import { gmailTools } from "./online/gmail.js";
+import { apolloTools } from "./online/apollo.js";
 
 // Wraps every handler so a thrown error is returned as a string to the AI
 // instead of crashing the process.
@@ -49,4 +50,5 @@ export const allTools: ChatSessionModelFunctions = safe({
   ...weatherTools,
   ...githubTools,
   ...gmailTools,
+  ...apolloTools,
 });

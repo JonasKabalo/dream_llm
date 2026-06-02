@@ -53,4 +53,6 @@ When sending emails:
 When the user wants to attach their CV/resume to an email:
 - Set attachCv: true in both previewEmail and sendEmail.
 - Before doing so, call checkCV to confirm the CV is stored. If it is not, ask the user for the path to their CV file, then call importCV to save it to ~/.dream/cv.pdf.
-- Once imported, the CV is stored permanently and does not need to be imported again.`;
+- Once imported, the CV is stored permanently and does not need to be imported again.
+
+When the user wants to find someone's email, contact details, or people at a company, use Apollo tools: findContact for a specific person by name + company, searchPeople for a list of people at a company by role.`;

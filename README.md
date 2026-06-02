@@ -25,6 +25,7 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 | Weather | "What's the weather in Paris?" |
 | Gmail | "Send an email to..." / "What's in my inbox?" / "Attach my CV" |
 | GitHub | "List my repos" / "Create a PR" / "Open an issue" |
+| Apollo.io | "Find the hiring manager at Stripe" / "Find ryan@leotechnology.com" |
 
 ---
 
@@ -81,6 +82,22 @@ dream › CV saved. It will be attached whenever you ask.
 ```
 
 Your CV is saved to `~/.dream/cv.pdf`. From that point on, just say "attach my CV" and Dream handles the rest — the file is embedded as a PDF attachment in the email.
+
+### Apollo.io
+```bash
+dream setup-apollo
+```
+You need an API key from [Apollo.io Settings → Integrations → API](https://app.apollo.io/#/settings/integrations/api).
+
+Once connected, you can ask Dream to find professional email addresses and contacts by name and company:
+
+```
+you  › find the hiring manager at Modo Energy
+dream › [calls searchPeople] → Found 3 people at Modo Energy (title: Hiring Manager): ...
+
+you  › find Ryan Lockyer at Leo Technology
+dream › [calls findContact] → Name: Ryan Lockyer / Email: ryan@leotechnology.com / Title: Founder & Director
+```
 
 ### GitHub
 ```bash

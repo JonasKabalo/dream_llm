@@ -32,7 +32,8 @@
     "typecheck": "tsc --noEmit",
     "setup": "tsx scripts/setup.ts",
     "setup-github": "tsx scripts/setup-github.ts",
-    "setup-gmail": "tsx scripts/setup-gmail.ts"
+    "setup-gmail": "tsx scripts/setup-gmail.ts",
+    "setup-apollo": "tsx scripts/setup-apollo.ts"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

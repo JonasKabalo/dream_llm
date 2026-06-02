@@ -20,9 +20,14 @@ export interface GmailCredentials {
   displayName: string;
 }
 
+export interface ApolloCredentials {
+  apiKey: string;
+}
+
 export interface Credentials {
   github?: GithubCredentials;
   gmail?: GmailCredentials;
+  apollo?: ApolloCredentials;
 }
 
 export function loadCredentials(): Credentials {
@@ -51,4 +56,10 @@ export function getGmailCreds(): GmailCredentials {
   const creds = loadCredentials();
   if (!creds.gmail) throw new Error("Gmail not set up. Run: npm run setup-gmail");
   return creds.gmail;
+}
+
+export function getApolloCreds(): ApolloCredentials {
+  const creds = loadCredentials();
+  if (!creds.apollo) throw new Error("Apollo not set up. Run: dream setup-apollo");
+  return creds.apollo;
 }

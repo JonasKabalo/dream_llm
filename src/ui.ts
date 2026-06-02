@@ -40,6 +40,7 @@ const SECTIONS: ToolSection[] = [
       { icon: "📧", name: "Gmail",   example: "Send an email / Draft an email / List my inbox" },
       { icon: "🌤 ", name: "Weather", example: "What's the weather in Paris? / What's the weather now?" },
       { icon: "🐙", name: "GitHub",  example: "List my repos / Create a PR / Open an issue" },
+      { icon: "🔍", name: "Apollo",  example: "Find the hiring manager at Stripe / Find ryan@leotechnology.com" },
     ],
   },
 ];
