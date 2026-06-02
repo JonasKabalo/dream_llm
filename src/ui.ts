@@ -23,7 +23,7 @@ const SECTIONS: ToolSection[] = [
     color: chalk.green,
     tools: [
       { icon: "⏰", name: "Date & time",      example: "What time is it in Tokyo? / How many days until June 15?" },
-      { icon: "📄", name: "Files",             example: "Create / read / edit / move / copy / delete / search files" },
+      { icon: "📄", name: "Files & PDFs",       example: "Create / read / edit / move / copy / delete / search files — reads PDF text too" },
       { icon: "📋", name: "Clipboard",         example: "Copy this to my clipboard / What's in my clipboard?" },
       { icon: "💻", name: "System info",       example: "How much memory am I using? / Battery level?" },
       { icon: "🚀", name: "Open app or file",  example: "Open Spotify / Open ~/Desktop/report.pdf" },

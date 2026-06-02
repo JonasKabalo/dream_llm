@@ -10,7 +10,8 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 | Tool | Example |
 |---|---|
 | Date & time | "What time is it in Tokyo?" |
-| Files | "Create / read / move / copy / delete / search files" |
+| Files | "Create / read / edit / move / copy / delete / search files" |
+| PDF reader | "Read my CV" / "What are my skills in `~/.dream/cv.pdf`?" |
 | Clipboard | "Copy this to my clipboard" |
 | System info | "How much memory am I using? Battery level?" |
 | Open apps | "Open Spotify" / "Open ~/Desktop/report.pdf" |
@@ -22,7 +23,7 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 | Tool | Example |
 |---|---|
 | Weather | "What's the weather in Paris?" |
-| Gmail | "Send an email to..." / "What's in my inbox?" |
+| Gmail | "Send an email to..." / "What's in my inbox?" / "Attach my CV" |
 | GitHub | "List my repos" / "Create a PR" / "Open an issue" |
 
 ---
@@ -68,6 +69,18 @@ You need OAuth 2.0 credentials from [Google Cloud Console](https://console.cloud
 2. Create OAuth client ID → **Desktop app**
 3. Add your Google account as a test user under OAuth consent screen
 4. Run the command above — your browser opens, you approve, done
+
+### CV attachment
+Tell Dream where your CV is and it will store it for future emails:
+
+```
+you  › attach my cv to the email please
+dream › Where is your CV file? Give me the path.
+you  › ~/Desktop/JonasKabalo_CV.pdf
+dream › CV saved. It will be attached whenever you ask.
+```
+
+Your CV is saved to `~/.dream/cv.pdf`. From that point on, just say "attach my CV" and Dream handles the rest — the file is embedded as a PDF attachment in the email.
 
 ### GitHub
 ```bash
