@@ -22,19 +22,24 @@ export async function run(): Promise<void> {
 
   console.log("\n  Verifying API key...");
 
-  const res = await fetch("https://api.apollo.io/api/v1/people/search", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ api_key: apiKey, per_page: 1, page: 1 }),
+  const res = await fetch("https://api.apollo.io/api/v1/auth/health", {
+    headers: { "X-Api-Key": apiKey },
   });
 
   if (!res.ok) {
-    console.error(`  Error: ${res.status} — invalid API key or no network.`);
+    console.error(`  Error: ${res.status} — could not verify API key. Check it and try again.`);
+    process.exit(1);
+  }
+
+  const health = await res.json() as { is_logged_in?: boolean };
+  if (!health.is_logged_in) {
+    console.error("  Error: API key is not valid.");
     process.exit(1);
   }
 
   saveCredentials({ apollo: { apiKey } });
 
-  console.log("  Apollo.io API key verified and saved to ~/.dream/credentials.json");
-  console.log("  You can now ask Dream to find emails and people at companies.\n");
+  console.log("  API key verified and saved to ~/.dream/credentials.json");
+  console.log("  Note: contact search requires a Basic+ Apollo plan.");
+  console.log("  You can now ask Dream to find emails and contacts at companies.\n");
 }

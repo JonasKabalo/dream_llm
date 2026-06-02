@@ -4,12 +4,10 @@ import type { ChatSessionModelFunctions } from "node-llama-cpp";
 const BASE = "https://api.apollo.io/api/v1";
 
 function headers(): Record<string, string> {
-  return { "Content-Type": "application/json" };
-}
-
-// Apollo v1 requires the key in both the header and the request body.
-function withKey(body: Record<string, unknown>): string {
-  return JSON.stringify({ api_key: getApolloCreds().apiKey, ...body });
+  return {
+    "Content-Type": "application/json",
+    "X-Api-Key": getApolloCreds().apiKey,
+  };
 }
 
 interface ApolloPerson {
@@ -57,7 +55,7 @@ export const apolloTools = {
       const res = await fetch(`${BASE}/people/match`, {
         method: "POST",
         headers: headers(),
-        body: withKey({
+        body: JSON.stringify({
           first_name: firstName,
           last_name: lastName,
           organization_name: company,
@@ -66,7 +64,11 @@ export const apolloTools = {
       });
 
       if (!res.ok) {
-        return `Apollo API error: ${res.status} ${res.statusText}`;
+        const body = await res.json().catch(() => ({})) as { error_code?: string };
+        if (body.error_code === "API_INACCESSIBLE") {
+          return "This Apollo feature requires a paid plan (Basic or higher). Upgrade at https://app.apollo.io/";
+        }
+        return `Apollo error ${res.status}: ${res.statusText}`;
       }
 
       const data = await res.json() as { person?: ApolloPerson | null };
@@ -103,11 +105,15 @@ export const apolloTools = {
       const res = await fetch(`${BASE}/people/search`, {
         method: "POST",
         headers: headers(),
-        body: withKey(body),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {
-        return `Apollo API error: ${res.status} ${res.statusText}`;
+        const body = await res.json().catch(() => ({})) as { error_code?: string };
+        if (body.error_code === "API_INACCESSIBLE") {
+          return "This Apollo feature requires a paid plan (Basic or higher). Upgrade at https://app.apollo.io/";
+        }
+        return `Apollo error ${res.status}: ${res.statusText}`;
       }
 
       const data = await res.json() as {
