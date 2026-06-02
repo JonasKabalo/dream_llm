@@ -10,6 +10,24 @@ import { readInput } from "./input.js";
 // ── CLI subcommand routing ────────────────────────────────────────────────────
 const subcommand = process.argv[2];
 if (subcommand) {
+  if (subcommand === "version") {
+    const pkg = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as { version: string };
+    console.log(`dream v${pkg.version}`);
+    process.exit(0);
+  }
+
+  if (subcommand === "update") {
+    const { execSync } = await import("child_process");
+    console.log("Updating dream to the latest version...");
+    try {
+      execSync("npm install -g dream-local@latest", { stdio: "inherit" });
+    } catch {
+      console.error("Update failed. Try: npm install -g dream-local@latest");
+      process.exit(1);
+    }
+    process.exit(0);
+  }
+
   const routes: Record<string, () => Promise<{ run: () => Promise<void> }>> = {
     "setup":        () => import("./setup/model.js"),
     "setup-github": () => import("./setup/github.js"),
@@ -23,7 +41,7 @@ if (subcommand) {
     process.exit(0);
   } else {
     console.error(`Unknown command: dream ${subcommand}`);
-    console.error("Available: dream setup | dream setup-github | dream setup-gmail | dream setup-apollo");
+    console.error("Available: dream setup | dream setup-github | dream setup-gmail | dream setup-apollo | dream version | dream update");
     process.exit(1);
   }
 }
