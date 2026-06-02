@@ -7,12 +7,34 @@ import { isCommand, runCommand } from "./commands.js";
 import { printBanner, startLoadingPhase, clearLoading, printGoodbye, printStats, startThinking, prompt } from "./ui.js";
 import { readInput } from "./input.js";
 
+// ── CLI subcommand routing ────────────────────────────────────────────────────
+const subcommand = process.argv[2];
+if (subcommand) {
+  const routes: Record<string, () => Promise<{ run: () => Promise<void> }>> = {
+    "setup":        () => import("./setup/model.js"),
+    "setup-github": () => import("./setup/github.js"),
+    "setup-gmail":  () => import("./setup/gmail.js"),
+    "setup-apollo": () => import("./setup/apollo.js"),
+  };
+  const loader = routes[subcommand];
+  if (loader) {
+    const mod = await loader();
+    await mod.run();
+    process.exit(0);
+  } else {
+    console.error(`Unknown command: dream ${subcommand}`);
+    console.error("Available: dream setup | dream setup-github | dream setup-gmail | dream setup-apollo");
+    process.exit(1);
+  }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 let activeModel: DreamModel | null = null;
 
 async function main(): Promise<void> {
   if (!fs.existsSync(MODEL_PATH)) {
     console.error(`Model not found at: ${MODEL_PATH}`);
-    console.error("Run: npm run setup");
+    console.error("Run: dream setup");
     process.exit(1);
   }
 
