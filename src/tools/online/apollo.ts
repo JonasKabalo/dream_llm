@@ -4,10 +4,12 @@ import type { ChatSessionModelFunctions } from "node-llama-cpp";
 const BASE = "https://api.apollo.io/api/v1";
 
 function headers(): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    "X-Api-Key": getApolloCreds().apiKey,
-  };
+  return { "Content-Type": "application/json" };
+}
+
+// Apollo v1 requires the key in both the header and the request body.
+function withKey(body: Record<string, unknown>): string {
+  return JSON.stringify({ api_key: getApolloCreds().apiKey, ...body });
 }
 
 interface ApolloPerson {
@@ -55,7 +57,7 @@ export const apolloTools = {
       const res = await fetch(`${BASE}/people/match`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify({
+        body: withKey({
           first_name: firstName,
           last_name: lastName,
           organization_name: company,
@@ -101,7 +103,7 @@ export const apolloTools = {
       const res = await fetch(`${BASE}/people/search`, {
         method: "POST",
         headers: headers(),
-        body: JSON.stringify(body),
+        body: withKey(body),
       });
 
       if (!res.ok) {

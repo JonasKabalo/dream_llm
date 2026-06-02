@@ -24,11 +24,8 @@ export async function run(): Promise<void> {
 
   const res = await fetch("https://api.apollo.io/api/v1/people/search", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Api-Key": apiKey,
-    },
-    body: JSON.stringify({ per_page: 1, page: 1 }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ api_key: apiKey, per_page: 1, page: 1 }),
   });
 
   if (!res.ok) {
