@@ -1,6 +1,6 @@
 # Dream
 
-Your personal local AI assistant — powered by **Phi-4 14B**, running fully offline on your machine. No cloud. No subscription. No data leaving your machine.
+Your personal local AI assistant — powered by **Qwen3.5 9B** (native tool calling), running fully offline on your machine. No cloud. No subscription. No data leaving your machine.
 
 ---
 
@@ -9,6 +9,7 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 ### Offline (no internet required)
 | Tool | Example |
 |---|---|
+| Calculator | "What's 23456 * 3938342?" — exact arithmetic via tool, never hallucinated |
 | Date & time | "What time is it in Tokyo?" |
 | Files | "Create / read / edit / move / copy / delete / search files" |
 | PDF reader | "Read my CV" / "What are my skills in `~/.dream/cv.pdf`?" |
@@ -23,7 +24,7 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 | Tool | Example |
 |---|---|
 | Weather | "What's the weather in Paris?" |
-| Gmail | "Send an email to..." / "What's in my inbox?" / "Attach my CV" |
+| Gmail | "Send an email to..." / "How many emails do I have?" / "Export all my flight bookings between London and Nice to a CSV" / "Attach my CV" |
 | GitHub | "List my repos" / "Create a PR" / "Open an issue" |
 | Apollo.io | "Find the hiring manager at Stripe" / "Find ryan@leotechnology.com" |
 
@@ -49,13 +50,22 @@ Your personal local AI assistant — powered by **Phi-4 14B**, running fully off
 npm install -g dream-local
 ```
 
-Then download the model (~8.5 GB, one time):
+Then download the model (~5.7 GB, one time):
 
 ```bash
 dream setup
 ```
 
 That's it. Run `dream` to start.
+
+### Models
+
+| Model | Size | Notes |
+|---|---|---|
+| **Qwen3.5 9B** (default) | ~5.7 GB | Native function calling, fast, leaves room for the full 16K context |
+| Phi-4 14B (legacy) | ~8.4 GB | `DREAM_MODEL=phi4 dream` to run it; `DREAM_MODEL=phi4 dream setup` to download it |
+
+If the default model isn't downloaded yet but Phi-4 is, Dream falls back to Phi-4 automatically.
 
 ---
 
@@ -68,8 +78,15 @@ dream setup-gmail
 You need OAuth 2.0 credentials from [Google Cloud Console](https://console.cloud.google.com):
 1. Create a project → Enable **Gmail API**
 2. Create OAuth client ID → **Desktop app**
-3. Add your Google account as a test user under OAuth consent screen
+3. Under **OAuth consent screen → Publishing status**, click **Publish app** (set it to *In production*)
 4. Run the command above — your browser opens, you approve, done
+
+> **⚠️ Important — keep the app "In production".** If you leave the OAuth app in
+> *Testing* mode (with your account added as a test user), Google expires the
+> login after **7 days** and every Gmail request fails with `invalid_grant`
+> until you re-run `dream setup-gmail`. Publishing to production keeps the
+> login alive indefinitely. The "unverified app" warning during authorization
+> is expected and fine for personal use — click *Advanced → Continue*.
 
 ### CV attachment
 Tell Dream where your CV is and it will store it for future emails:
@@ -138,6 +155,7 @@ Inside the assistant:
 | Slash command | What it does |
 |---|---|
 | `/tools-list` | List all available tools |
+| `/keys` | Show all keyboard shortcuts |
 
 ### Keyboard shortcuts
 
@@ -199,6 +217,21 @@ npm run setup-github   # connect GitHub (local dev)
 npm run setup-gmail    # connect Gmail (local dev)
 ```
 
+### Tests
+
+```bash
+npm test               # node:test suite — covers every tool
+npm run typecheck      # strict TypeScript over src/ and tests/
+npm run lint           # ESLint over src/ and tests/
+```
+
+The suite is safe to run anywhere: unit tests use temp directories
+(`DREAM_CONFIG_DIR`, `DREAM_NOTES_DIR` overrides), live tests make **read-only**
+calls with your real credentials and skip automatically when credentials or
+network are missing (so CI always passes). Two tests are opt-in:
+`DREAM_TEST_CLIPBOARD=1` (mutates your clipboard) and `DREAM_TEST_APOLLO=1`
+(draws on Apollo plan quota).
+
 To publish a new version:
 
 ```bash
@@ -215,18 +248,20 @@ npm publish
 src/
 ├── main.ts           entry point — CLI loop
 ├── input.ts          raw-mode input handler (multi-line, paste, keyboard shortcuts)
+├── layout.ts         sticky-input terminal layout (VT100 scroll region zones)
 ├── agent.ts          agent — tool dispatch + smart directory context injection
-├── model.ts          Phi-4 model wrapper (node-llama-cpp)
+├── model.ts          Phi-4 model wrapper (node-llama-cpp) + streaming output filter
 ├── config.ts         model path, sender name, system prompt
 ├── credentials.ts    credential store (~/.dream/credentials.json)
 ├── commands.ts       slash command router
 ├── ui.ts             terminal UI (chalk, spinner, banner)
 ├── setup/
-│   ├── model.ts      model downloader  (dream setup)
-│   ├── github.ts     GitHub PAT setup  (dream setup-github)
-│   └── gmail.ts      Gmail OAuth setup (dream setup-gmail)
+│   ├── model.ts      model downloader   (dream setup)
+│   ├── github.ts     GitHub PAT setup   (dream setup-github)
+│   ├── gmail.ts      Gmail OAuth setup  (dream setup-gmail)
+│   └── apollo.ts     Apollo.io key setup (dream setup-apollo)
 └── tools/
-    ├── index.ts      combines all tools
+    ├── index.ts      combines all tools + error-to-string safety wrapper
     ├── offline/      no internet required
     │   ├── datetime.ts
     │   ├── dateutils.ts
@@ -238,18 +273,21 @@ src/
     └── online/       requires internet
         ├── weather.ts
         ├── github.ts
-        └── gmail.ts
+        ├── gmail.ts
+        └── apollo.ts
 
+tests/                node:test suite (npm test) — one file per area
 scripts/              local dev helpers (not shipped in npm package)
 ├── setup.ts
 ├── setup-github.ts
-└── setup-gmail.ts
+├── setup-gmail.ts
+└── setup-apollo.ts
 ```
 
 ---
 
 ## Stack
 
-- **Model**: [Phi-4 14B Q4_K_M](https://huggingface.co/bartowski/phi-4-GGUF) by Microsoft
+- **Model**: [Qwen3.5 9B Q4_K_M](https://huggingface.co/unsloth/Qwen3.5-9B-GGUF) (default) · [Phi-4 14B Q4_K_M](https://huggingface.co/bartowski/phi-4-GGUF) (legacy, `DREAM_MODEL=phi4`)
 - **Runtime**: [node-llama-cpp](https://github.com/withcatai/node-llama-cpp) — Metal (macOS), CUDA (Windows/Linux), or CPU
 - **Language**: TypeScript (strict mode)

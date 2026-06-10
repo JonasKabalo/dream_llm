@@ -22,6 +22,7 @@ const SECTIONS: ToolSection[] = [
     subtitle: "no internet required",
     color: chalk.green,
     tools: [
+      { icon: "🧮", name: "Calculator",       example: "What's 23456 * 3938342? — exact math, no guessing" },
       { icon: "⏰", name: "Date & time",      example: "What time is it in Tokyo? / How many days until June 15?" },
       { icon: "📄", name: "Files & PDFs",       example: "Create / read / edit / move / copy / delete / search files — reads PDF text too" },
       { icon: "📋", name: "Clipboard",         example: "Copy this to my clipboard / What's in my clipboard?" },
@@ -37,7 +38,7 @@ const SECTIONS: ToolSection[] = [
     subtitle: "requires internet",
     color: chalk.yellow,
     tools: [
-      { icon: "📧", name: "Gmail",   example: "Send an email / Draft an email / List my inbox" },
+      { icon: "📧", name: "Gmail",   example: "Send an email / How many emails do I have? / Export all my flight bookings to a CSV" },
       { icon: "🌤 ", name: "Weather", example: "What's the weather in Paris? / What's the weather now?" },
       { icon: "🐙", name: "GitHub",  example: "List my repos / Create a PR / Open an issue" },
       { icon: "🔍", name: "Apollo",  example: "Find the hiring manager at Stripe / Find ryan@leotechnology.com" },
@@ -51,7 +52,7 @@ function pad(text: string, width: number): string {
   return text + " ".repeat(spaces);
 }
 
-export function printBanner(): void {
+export function printBanner(modelLabel: string): void {
   const title = "✦  D R E A M  ✦";
   const subtitle = "Your personal local AI assistant";
   console.log();
@@ -70,7 +71,7 @@ export function printBanner(): void {
   console.log(chalk.dim("  │") + " ".repeat(WIDTH) + chalk.dim("│"));
   console.log(chalk.dim("  ╰" + "─".repeat(WIDTH) + "╯"));
   console.log();
-  console.log("  " + chalk.dim("Powered by Phi-4 14B  ·  Runs fully offline"));
+  console.log("  " + chalk.dim(`Powered by ${modelLabel}  ·  Runs fully offline`));
   console.log();
 }
 
@@ -101,14 +102,14 @@ export function startLoadingPhase(label: string): () => number {
   };
 }
 
-export function clearLoading(loadMs: number, warmMs: number): void {
+export function clearLoading(loadMs: number, warmMs: number, extra?: string): void {
   const line =
     "  " + chalk.green("✓") + "  " +
     chalk.bold("Ready") +
     chalk.dim("  ·  Type ") +
     chalk.cyan("/tools-list") +
     chalk.dim(" to get started.") +
-    chalk.dim(`  (model ${(loadMs / 1000).toFixed(1)}s  ·  warmup ${(warmMs / 1000).toFixed(1)}s)`);
+    chalk.dim(`  (model ${(loadMs / 1000).toFixed(1)}s  ·  warmup ${(warmMs / 1000).toFixed(1)}s${extra ? `  ·  ${extra}` : ""})`);
   process.stdout.write("\r" + line + "\n");
 }
 
@@ -126,12 +127,14 @@ export function printStats(ms: number, tokens: number): void {
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-export function startThinking(): () => void {
+// Animated status line ("Thinking...", "Using listEmails…", …). The returned
+// function stops the animation and clears the line.
+export function startThinking(label: string = "Thinking..."): () => void {
   let i = 0;
-  process.stdout.write("  " + chalk.dim(SPINNER_FRAMES[0] + "  Thinking..."));
+  process.stdout.write("  " + chalk.dim(SPINNER_FRAMES[0] + "  " + label));
   const id = setInterval(() => {
     i = (i + 1) % SPINNER_FRAMES.length;
-    process.stdout.write("\r  " + chalk.dim(SPINNER_FRAMES[i] + "  Thinking..."));
+    process.stdout.write("\r  " + chalk.dim(SPINNER_FRAMES[i] + "  " + label));
   }, 80);
   return (): void => {
     clearInterval(id);

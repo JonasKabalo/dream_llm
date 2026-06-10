@@ -27,13 +27,17 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "build": "tsc && chmod +x dist/main.js",
-    "prepublishOnly": "npm run build && npm run typecheck",
-    "lint": "eslint src/**/*.ts",
-    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test",
+    "lint": "eslint src/**/*.ts tests/**/*.ts",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "tsx --test tests/*.test.ts",
     "setup": "tsx scripts/setup.ts",
     "setup-github": "tsx scripts/setup-github.ts",
     "setup-gmail": "tsx scripts/setup-gmail.ts",
     "setup-apollo": "tsx scripts/setup-apollo.ts"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

@@ -1,5 +1,6 @@
 import process from "process";
 import chalk from "chalk";
+import { INPUT_ROWS, inputTop } from "./layout.js";
 
 function visibleLen(s: string): number {
   return s.replace(/\x1b\[[0-9;]*m/g, "").length;
@@ -130,8 +131,7 @@ export async function readInput(promptStr: string): Promise<string | null> {
       visible: number[];
       totalContentRows: number;
     } {
-      const th = process.stdout.rows || 24;
-      const maxContentRows = Math.max(1, th - 3);
+      const maxContentRows = Math.max(1, INPUT_ROWS - 3); // 3 rows within the sticky input zone
 
       // viewportStart must not exceed cursorLine
       if (viewportStart > cursorLine) viewportStart = cursorLine;
@@ -264,6 +264,17 @@ export async function readInput(promptStr: string): Promise<string | null> {
       stdin.setRawMode(false);
       stdin.pause();
       stdin.removeListener("data", onData);
+      process.removeListener("SIGWINCH", onResize);
+    }
+
+    // On resize, main.ts re-applies the scroll region first (its SIGWINCH
+    // listener was registered earlier). Our state is relative to rows that may
+    // no longer exist, so reposition into the new input zone and redraw fresh.
+    function onResize(): void {
+      prevTermRows = 0;
+      cursorRowAfterRender = 0;
+      stdout.write(`\x1b[${inputTop()};1H`);
+      render();
     }
 
     // Clear status bar, redraw visible input with white-background highlight,
@@ -476,6 +487,7 @@ export async function readInput(promptStr: string): Promise<string | null> {
     }
 
     stdin.on("data", onData);
+    process.on("SIGWINCH", onResize);
     render();
   });
 }

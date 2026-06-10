@@ -1,9 +1,15 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import type { ChatSessionModelFunctions } from "node-llama-cpp";
 import { DreamModel, type ChatMeta } from "./model.js";
 import { allTools } from "./tools/index.js";
 import { getCurrentCwd } from "./tools/offline/terminal.js";
+
+export interface ToolEvent {
+  type: "start" | "end";
+  name: string;
+}
 
 const WELL_KNOWN: Record<string, string> = {
   desktop:   path.join(os.homedir(), "Desktop"),
@@ -15,16 +21,26 @@ const WELL_KNOWN: Record<string, string> = {
   home:      os.homedir(),
 };
 
+// Filesystem vocabulary that must appear before we treat a message as a
+// listing request. Without this gate, phrases like "show me the last email" or
+// "list my unread emails" had a directory listing injected into the prompt,
+// derailing the model on questions that have nothing to do with files.
+const FS_VOCAB = /\b(files?|folders?|director(?:y|ies)|dir|desktop|downloads|documents|pictures|movies|music)\b/i;
+
 // Resolve which directory the user wants to list, or null if the message
 // isn't a listing request. Handles:
 //   "ls" / "list files" → cwd
 //   "ls in dream" / "list the src folder" → cwd/dream, cwd/src
 //   "ls in the Desktop" → ~/Desktop
 //   "ls ~/Downloads" / "ls /tmp" → absolute paths
-function resolveListingTarget(msg: string): string | null {
+// Exported for tests.
+export function resolveListingTarget(msg: string): string | null {
   // "run ls", "execute ls", etc. → let the model use runTerminalCommand instead
   if (/\b(run|execute|call)\b.{0,15}\bls\b/i.test(msg)) return null;
-  if (!/\b(ls|list\b|show\s+me\s+the|what.{0,20}(in|inside))/i.test(msg)) return null;
+  const bareLs = /^\s*ls\b/i.test(msg);
+  const listingPhrase =
+    /\b(ls|list|show\s+me|what.{0,20}\b(in|inside)\b)/i.test(msg) && FS_VOCAB.test(msg);
+  if (!bareLs && !listingPhrase) return null;
 
   // Explicit ~/path or /absolute/path
   const absMatch = msg.match(/(~\/[\w.\-/]+|\/[\w.\-/]+)/);
@@ -62,6 +78,25 @@ function buildListingContext(msg: string): string | null {
   }
 }
 
+// Wrap every tool handler so the UI can show what's running ("Using
+// listEmails…") while the model waits on a tool. The wrapped definitions
+// serialize identically to allTools, so the warm KV cache stays valid.
+function withToolEvents(onToolEvent: (ev: ToolEvent) => void): ChatSessionModelFunctions {
+  return Object.fromEntries(
+    Object.entries(allTools).map(([name, tool]) => [name, {
+      ...tool,
+      handler: async (params: Record<string, unknown>): Promise<unknown> => {
+        onToolEvent({ type: "start", name });
+        try {
+          return await (tool.handler as (p: Record<string, unknown>) => unknown)(params);
+        } finally {
+          onToolEvent({ type: "end", name });
+        }
+      },
+    }]),
+  ) as ChatSessionModelFunctions;
+}
+
 export class Agent {
   private model: DreamModel;
 
@@ -77,15 +112,26 @@ export class Agent {
       await this.model.chat("Hi", allTools, undefined, 1);
     } catch {
       // non-fatal — worst case the first message is still slow
+    } finally {
+      // Critical: drop the warmup turn from history. maxTokens:1 cuts a
+      // thinking model off mid-`<think>`; leaving that unfinished thought in
+      // the history derails every subsequent response (the model just emits
+      // "<think>" and stops). The cached prefix survives the reset.
+      this.model.resetConversation();
     }
   }
 
-  async respond(userMessage: string, onChunk?: (token: string) => void): Promise<ChatMeta> {
+  async respond(
+    userMessage: string,
+    onChunk?: (token: string) => void,
+    onToolEvent?: (ev: ToolEvent) => void,
+  ): Promise<ChatMeta> {
     let message = userMessage;
 
     const listing = buildListingContext(message);
     if (listing) message += `\n\n${listing}`;
 
-    return this.model.chat(message, allTools, onChunk);
+    const tools = onToolEvent ? withToolEvents(onToolEvent) : allTools;
+    return this.model.chat(message, tools, onChunk);
   }
 }

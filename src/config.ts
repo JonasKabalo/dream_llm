@@ -1,3 +1,4 @@
+import fs from "fs";
 import path from "path";
 import os from "os";
 import { fileURLToPath } from "url";
@@ -6,7 +7,59 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export const PROJECT_ROOT = path.resolve(__dirname, "..");
 
-export const MODEL_PATH = path.join(os.homedir(), ".dream", "models", "hf_bartowski_phi-4-Q4_K_M.gguf");
+export const MODELS_DIR = path.join(os.homedir(), ".dream", "models");
+
+// ── Model registry ───────────────────────────────────────────────────────────
+// Default is Qwen3.5 9B: native function calling (no hand-rolled tool syntax),
+// ~3 GB lighter than Phi-4 (full 16K context fits on a 16 GB Mac), faster.
+// Phi-4 stays available for comparison: DREAM_MODEL=phi4 dream
+export type ModelId = "qwen" | "phi4";
+
+export interface ModelSpec {
+  id: ModelId;
+  label: string;
+  fileName: string;
+  downloadUri: string;
+  // "auto" lets node-llama-cpp resolve the model's native chat wrapper
+  // (QwenChatWrapper for Qwen — includes real tool-call syntax).
+  // "phi-jinja" is the legacy custom template for models with no native
+  // function-calling format.
+  wrapper: "auto" | "phi-jinja";
+}
+
+export const MODELS: Record<ModelId, ModelSpec> = {
+  qwen: {
+    id: "qwen",
+    label: "Qwen3.5 9B",
+    fileName: "hf_unsloth_Qwen3.5-9B-Q4_K_M.gguf",
+    downloadUri: "hf:unsloth/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf",
+    wrapper: "auto",
+  },
+  phi4: {
+    id: "phi4",
+    label: "Phi-4 14B",
+    fileName: "hf_bartowski_phi-4-Q4_K_M.gguf",
+    downloadUri: "hf:bartowski/phi-4-GGUF/phi-4-Q4_K_M.gguf",
+    wrapper: "phi-jinja",
+  },
+};
+
+export function modelPath(spec: ModelSpec): string {
+  return path.join(MODELS_DIR, spec.fileName);
+}
+
+// Active model: DREAM_MODEL env override, else qwen, falling back to phi4
+// when the qwen file hasn't been downloaded yet (run: dream setup).
+export function activeModel(): ModelSpec {
+  const requested = process.env.DREAM_MODEL?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (requested === "phi4") return MODELS.phi4;
+  if (requested === "qwen") return MODELS.qwen;
+  if (!fs.existsSync(modelPath(MODELS.qwen)) && fs.existsSync(modelPath(MODELS.phi4))) {
+    return MODELS.phi4;
+  }
+  return MODELS.qwen;
+}
+
 export const CV_PATH = path.join(os.homedir(), ".dream", "cv.pdf");
 
 export const SENDER_NAME = "Jonas Kabalo";
@@ -54,5 +107,13 @@ When the user wants to attach their CV/resume to an email:
 - Set attachCv: true in both previewEmail and sendEmail.
 - Before doing so, call checkCV to confirm the CV is stored. If it is not, ask the user for the path to their CV file, then call importCV to save it to ~/.dream/cv.pdf.
 - Once imported, the CV is stored permanently and does not need to be imported again.
+
+NEVER do arithmetic yourself — for ANY calculation (multiplication, percentages, sums), call the calculate tool and report its exact result.
+
+When the user asks about their email history (counts, finding bookings, receipts, a sender):
+- "How many emails do I have in total / ever?" → call getEmailStats (exact account totals). Never answer counts from the number of rows listEmails returned — it shows at most 20.
+- "How many emails about X / from Y?" → call countEmails with a Gmail query.
+- For a COMPLETE list, report, or file of matching emails (e.g. "list all my flight bookings") → call exportEmailsToCsv ONCE with a precise query and give the user the saved file path. NEVER type out long lists from listEmails — it only shows 20 and you will miss most results.
+- To explore or answer questions about a few emails, use listEmails with precise Gmail queries ('from:easyjet.com OR from:ryanair.com', 'subject:(booking OR confirmation) flight', add after:YYYY/MM/DD / before:YYYY/MM/DD), then readEmail on promising IDs.
 
 When the user wants to find someone's email, contact details, or people at a company, use Apollo tools: findContact for a specific person by name + company, searchPeople for a list of people at a company by role.`;

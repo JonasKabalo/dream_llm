@@ -1,18 +1,21 @@
-import path from "path";
-import os from "os";
 import { createModelDownloader } from "node-llama-cpp";
+import { MODELS_DIR, MODELS } from "../config.js";
 
 export async function run(): Promise<void> {
-  const modelsDir = path.join(os.homedir(), ".dream", "models");
+  // Download what was explicitly requested, else the default model — never the
+  // activeModel() fallback (it would re-download the OLD model when the new
+  // default hasn't been fetched yet, defeating the point of running setup).
+  const requested = process.env.DREAM_MODEL?.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const spec = requested === "phi4" ? MODELS.phi4 : MODELS.qwen;
 
   console.log("\n  Dream — Model Setup");
   console.log("  ─────────────────────────────────────");
-  console.log("  Downloading Phi-4 14B Q4_K_M (~8.5 GB)");
+  console.log(`  Downloading ${spec.label} (Q4_K_M)`);
   console.log("  This may take a while depending on your connection.\n");
 
   const downloader = await createModelDownloader({
-    modelUrl: "hf:bartowski/phi-4-GGUF/phi-4-Q4_K_M.gguf",
-    dirPath: modelsDir,
+    modelUrl: spec.downloadUri,
+    dirPath: MODELS_DIR,
     onProgress: ({ downloadedSize, totalSize }) => {
       const pct = totalSize > 0 ? ((downloadedSize / totalSize) * 100).toFixed(1) : "?";
       const downloaded = (downloadedSize / 1024 / 1024 / 1024).toFixed(2);
@@ -21,7 +24,7 @@ export async function run(): Promise<void> {
     },
   });
 
-  await downloader.download();
-  console.log(`\n\n  Model saved to ${modelsDir}`);
+  const savedPath = await downloader.download();
+  console.log(`\n\n  Model saved to ${savedPath}`);
   console.log("  All done! Run: dream\n");
 }

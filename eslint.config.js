@@ -3,11 +3,11 @@ import tsparser from "@typescript-eslint/parser";
 
 export default [
   {
-    files: ["src/**/*.ts"],
+    files: ["src/**/*.ts", "tests/**/*.ts"],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        project: "./tsconfig.json",
+        project: "./tsconfig.test.json",
       },
     },
     plugins: {

@@ -1,24 +1,5 @@
-import path from "path";
-import os from "os";
-import { createModelDownloader } from "node-llama-cpp";
+// Dev helper — same flow as `dream setup` (downloads the default model,
+// or DREAM_MODEL=phi4 for the legacy one).
+import { run } from "../src/setup/model.js";
 
-const modelsDir = path.join(os.homedir(), ".dream", "models");
-
-console.log("Downloading Phi-4 14B Q4_K_M (~8.5GB)...");
-console.log("This may take a while depending on your connection.\n");
-
-const downloader = await createModelDownloader({
-  modelUrl: "hf:bartowski/phi-4-GGUF/phi-4-Q4_K_M.gguf",
-  dirPath: modelsDir,
-  onProgress: ({ downloadedSize, totalSize }) => {
-    const pct = totalSize > 0 ? ((downloadedSize / totalSize) * 100).toFixed(1) : "?";
-    const downloaded = (downloadedSize / 1024 / 1024 / 1024).toFixed(2);
-    const total = (totalSize / 1024 / 1024 / 1024).toFixed(2);
-    process.stdout.write(`\rDownloading: ${pct}% (${downloaded} / ${total} GB)`);
-  },
-});
-
-await downloader.download();
-
-console.log(`\n\nModel saved to ${modelsDir}`);
-console.log("Run: npm start  (or: dream)");
+await run();

@@ -3,15 +3,18 @@ import path from "path";
 import os from "os";
 import type { ChatSessionModelFunctions } from "node-llama-cpp";
 
-const NOTES_DIR = path.join(os.homedir(), ".dream-notes");
+// Resolved lazily so tests can point DREAM_NOTES_DIR at a temp directory.
+function notesDir(): string {
+  return process.env.DREAM_NOTES_DIR ?? path.join(os.homedir(), ".dream-notes");
+}
 
 function ensureNotesDir(): void {
-  fs.mkdirSync(NOTES_DIR, { recursive: true });
+  fs.mkdirSync(notesDir(), { recursive: true });
 }
 
 function noteFile(title: string): string {
   const safe = title.replace(/[^a-zA-Z0-9-_ ]/g, "").trim().replace(/\s+/g, "-");
-  return path.join(NOTES_DIR, `${safe}.md`);
+  return path.join(notesDir(), `${safe}.md`);
 }
 
 export const notesTools = {
@@ -39,11 +42,11 @@ export const notesTools = {
     params: { type: "object", properties: {} } as const,
     handler(): string {
       ensureNotesDir();
-      const files = fs.readdirSync(NOTES_DIR).filter((f) => f.endsWith(".md"));
+      const files = fs.readdirSync(notesDir()).filter((f) => f.endsWith(".md"));
       if (!files.length) return "No notes yet.";
       return files
         .map((f) => {
-          const stat = fs.statSync(path.join(NOTES_DIR, f));
+          const stat = fs.statSync(path.join(notesDir(), f));
           const title = f.replace(/\.md$/, "").replace(/-/g, " ");
           return `• ${title}  (modified: ${stat.mtime.toLocaleDateString()})`;
         })
@@ -97,12 +100,12 @@ export const notesTools = {
     } as const,
     handler({ query }: { query: string }): string {
       ensureNotesDir();
-      const files = fs.readdirSync(NOTES_DIR).filter((f) => f.endsWith(".md"));
+      const files = fs.readdirSync(notesDir()).filter((f) => f.endsWith(".md"));
       const lower = query.toLowerCase();
       const matches: string[] = [];
 
       for (const f of files) {
-        const content = fs.readFileSync(path.join(NOTES_DIR, f), "utf-8");
+        const content = fs.readFileSync(path.join(notesDir(), f), "utf-8");
         if (content.toLowerCase().includes(lower)) {
           const title = f.replace(/\.md$/, "").replace(/-/g, " ");
           const line = content.split("\n").find((l) => l.toLowerCase().includes(lower)) ?? "";

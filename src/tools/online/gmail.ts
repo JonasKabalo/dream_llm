@@ -1,4 +1,6 @@
 import fs from "fs";
+import path from "path";
+import os from "os";
 import { google } from "googleapis";
 import { getGmailCreds, saveCredentials } from "../../credentials.js";
 import { SENDER_NAME, CV_PATH } from "../../config.js";
@@ -20,6 +22,9 @@ function getClient(): ReturnType<typeof google.gmail> {
         gmail: {
           ...creds,
           accessToken: tokens.access_token,
+          // Google occasionally rotates the refresh token — persist the new one
+          // or the stored one eventually goes stale (invalid_grant).
+          refreshToken: tokens.refresh_token ?? creds.refreshToken,
           expiryDate: tokens.expiry_date ?? creds.expiryDate,
         },
       });
@@ -29,13 +34,19 @@ function getClient(): ReturnType<typeof google.gmail> {
   return google.gmail({ version: "v1", auth });
 }
 
-const GREETING_PATTERNS = /^(hi|hello|dear|bonjour|salut)[,\s]/i;
-const CLOSING_PATTERNS = /\b(kind|warm|best|many)\s+regards|warm\s+wishes|best\s+wishes|yours\s+sincerely|sincerely\s+yours|sincerely|cordially|cordialement|sincèrement|amicalement/i;
+const GREETING_PATTERNS = /^(hi|hey|hello|dear|good\s+(?:morning|afternoon|evening)|bonjour|salut)\b/i;
+// A sign-off only counts when a paragraph BEGINS with it ("Kind regards,",
+// "Sincerely yours, Jonas"). Matching these words anywhere used to chop real
+// sentences — "I sincerely enjoyed our chat…" lost everything after "I".
+const CLOSING_START = /^(?:(?:kind|warm|best|many)\s+regards|warm\s+wishes|best\s+wishes|yours\s+sincerely|sincerely\s+yours|sincerely|cordially|cordialement|sinc[eè]rement|amicalement)\b/i;
 
 function recipientFirstName(to: string): string {
-  const local = to.split("@")[0];
+  // Accept both "addr@example.com" and "Name <addr@example.com>"
+  const addr = /<([^>]+)>/.exec(to)?.[1] ?? to;
+  const local = addr.split("@")[0];
   const cleaned = local.replace(/\d+/g, "");
   const first = cleaned.split(/[.\-_]+/)[0];
+  if (!first) return "there";
   return first.charAt(0).toUpperCase() + first.slice(1);
 }
 
@@ -54,15 +65,22 @@ function reflowParagraphs(text: string): string {
     .join("\n\n");
 }
 
-function formatBody(body: string, to: string): string {
-  let result = reflowParagraphs(body.trim());
+// Drop any model-written sign-off (and whatever follows it, e.g. the name
+// line) so the canonical signature is never duplicated. Runs BEFORE paragraph
+// reflow so "…\nKind regards,\nJonas" is still line-structured. Only cuts when
+// a non-first LINE starts with a closing phrase — never mid-sentence.
+function stripModelSignoff(body: string): string {
+  const lines = body.split("\n");
+  const idx = lines.findIndex((l, i) => i > 0 && CLOSING_START.test(l.trim()));
+  return idx > 0 ? lines.slice(0, idx).join("\n") : body;
+}
+
+// Exported for tests.
+export function formatBody(body: string, to: string): string {
+  let result = reflowParagraphs(stripModelSignoff(body.trim()));
 
   if (!GREETING_PATTERNS.test(result)) {
     result = `Hi ${recipientFirstName(to)},\n\n${result}`;
-  }
-
-  if (CLOSING_PATTERNS.test(result)) {
-    result = result.replace(/\n*(\b(kind|warm|best|many)\s+regards|warm\s+wishes|best\s+wishes|yours\s+sincerely|sincerely\s+yours|sincerely|cordially|cordialement|sincèrement|amicalement)[\s\S]*/gi, "").trimEnd();
   }
 
   const name = senderName();
@@ -209,8 +227,127 @@ export const gmailTools = {
     },
   },
 
+  getEmailStats: {
+    description: "Get exact mailbox totals for the whole Gmail account: total number of emails ever, total conversation threads, and the email address. Use this when the user asks how many emails they have overall or since the account began.",
+    params: { type: "object", properties: {} } as const,
+    async handler(): Promise<string> {
+      const gmail = getClient();
+      const { data } = await gmail.users.getProfile({ userId: "me" });
+      return [
+        `Email address: ${data.emailAddress}`,
+        `Total emails in the account: ${data.messagesTotal}`,
+        `Total conversation threads: ${data.threadsTotal}`,
+      ].join("\n");
+    },
+  },
+
+  countEmails: {
+    description: "Count exactly how many emails match a Gmail search query, e.g. 'from:easyjet.com', 'subject:(booking confirmation) after:2013/01/01', 'is:sent'. For the total of ALL emails in the account, use getEmailStats instead.",
+    params: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Gmail search query (same syntax as the Gmail search bar)" },
+      },
+      required: ["query"],
+    } as const,
+    async handler({ query }: { query: string }): Promise<string> {
+      const gmail = getClient();
+      let count = 0;
+      let pageToken: string | undefined;
+      // Pages of 500 IDs are cheap; cap at 40 pages (20,000 emails) for sanity.
+      for (let page = 0; page < 40; page++) {
+        const { data } = await gmail.users.messages.list({
+          userId: "me",
+          q: query,
+          maxResults: 500,
+          pageToken,
+        });
+        count += data.messages?.length ?? 0;
+        pageToken = data.nextPageToken ?? undefined;
+        if (!pageToken) return `${count} emails match "${query}".`;
+      }
+      return `More than ${count} emails match "${query}" (stopped counting at ${count}).`;
+    },
+  },
+
+  exportEmailsToCsv: {
+    description: "Export ALL emails matching a Gmail search query to a CSV file (columns: date, from, to, subject, gmail link), sorted oldest first. Use this whenever the user wants a complete list, report, or file of matching emails (e.g. all flight bookings) — unlike listEmails it has NO 20-result limit. Returns the file path and exact match count; do NOT re-type the rows afterwards.",
+    params: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Gmail search query, e.g. 'from:easyjet.com subject:booking (Nice OR London)'" },
+        filePath: { type: "string", description: "Where to save the CSV. Defaults to ~/Desktop/dream-emails-<timestamp>.csv" },
+        maxEmails: { type: "number", description: "Safety cap (default 1000)" },
+      },
+      required: ["query"],
+    } as const,
+    async handler({ query, filePath, maxEmails }: { query: string; filePath?: string; maxEmails?: number }): Promise<string> {
+      const gmail = getClient();
+      const cap = Math.min(maxEmails ?? 1000, 5000);
+
+      // 1. Collect ALL matching message IDs (paginated, 500 per page)
+      const ids: string[] = [];
+      let pageToken: string | undefined;
+      do {
+        const { data } = await gmail.users.messages.list({
+          userId: "me",
+          q: query,
+          maxResults: Math.min(500, cap - ids.length),
+          pageToken,
+        });
+        for (const m of data.messages ?? []) if (m.id) ids.push(m.id);
+        pageToken = data.nextPageToken ?? undefined;
+      } while (pageToken && ids.length < cap);
+
+      if (ids.length === 0) return `No emails match "${query}" — nothing exported. Try a broader query.`;
+
+      // 2. Fetch metadata with bounded concurrency (Gmail quota friendly)
+      type Row = { ts: number; date: string; from: string; to: string; subject: string; link: string };
+      const rows: Row[] = [];
+      const CONCURRENCY = 10;
+      for (let i = 0; i < ids.length; i += CONCURRENCY) {
+        const chunk = await Promise.all(
+          ids.slice(i, i + CONCURRENCY).map(async (id) => {
+            const { data } = await gmail.users.messages.get({
+              userId: "me", id, format: "metadata", metadataHeaders: ["From", "To", "Subject", "Date"],
+            });
+            const headers = data.payload?.headers ?? [];
+            const get = (name: string): string => headers.find((h) => h.name === name)?.value ?? "";
+            const ts = Number(data.internalDate ?? 0);
+            return {
+              ts,
+              date: ts ? new Date(ts).toISOString().slice(0, 16).replace("T", " ") : get("Date"),
+              from: get("From"),
+              to: get("To"),
+              subject: get("Subject"),
+              link: `https://mail.google.com/mail/u/0/#all/${id}`,
+            };
+          }),
+        );
+        rows.push(...chunk);
+      }
+      rows.sort((a, b) => a.ts - b.ts);
+
+      // 3. Write CSV
+      const esc = (s: string): string => `"${s.replace(/"/g, '""')}"`;
+      const csv = ["date,from,to,subject,gmail_link",
+        ...rows.map((r) => [r.date, r.from, r.to, r.subject, r.link].map(esc).join(",")),
+      ].join("\n") + "\n";
+
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[T:]/g, "-");
+      const target = filePath
+        ? path.resolve(filePath.replace(/^~/, os.homedir()))
+        : path.join(os.homedir(), "Desktop", `dream-emails-${stamp}.csv`);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, csv, "utf-8");
+
+      const capped = ids.length >= cap ? ` (capped at ${cap} — narrow the query or raise maxEmails for more)` : "";
+      return `Exported ${rows.length} emails matching "${query}" to ${target}${capped}. Columns: date, from, to, subject, gmail_link (oldest first). Tell the user the file location — do not re-type the rows.`;
+    },
+  },
+
   listEmails: {
-    description: "List or search Gmail messages.",
+    description: "List or search Gmail messages, newest first (max 20 per call — NOT the total; use countEmails/getEmailStats for counts, exportEmailsToCsv for complete lists). Supports full Gmail search syntax: from:, to:, subject:, after:YYYY/MM/DD, before:, OR, quotes. Examples: 'from:ryanair.com OR from:easyjet.com', 'subject:(booking confirmation) after:2013/01/01'. Returns metadata only — use readEmail with an ID for full content.",
     params: {
       type: "object",
       properties: {
